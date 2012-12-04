@@ -8,10 +8,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-//import com.example.helloandroid.Enum.Days;
 
 public class ReadToHashmap {
-	enum Days{Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday};
     public static void main(String[] args) throws Exception {
     	
         Map<String, String> map = new HashMap<String, String>();
@@ -48,23 +46,11 @@ public class ReadToHashmap {
             bw.write(src+"\t"+dest+"\t"+parts[2]+"\n");
             
         }
-        System.out.println(map1);
-        String s="Sunday";
-    	Days a;
-    	a=Days.valueOf(s);
 		bw.close();
         in.close();
         ou.close();
     }
     
-    public static <T, E> T getKeyByValue(Map<T, E> map, E value) {
-        for (Entry<T, E> entry : map.entrySet()) {
-            if (value.equals(entry.getValue())) {
-                return entry.getKey();
-            }
-        }
-        return null;
-    }
 
 }
 
