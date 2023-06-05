@@ -5,7 +5,7 @@
 
 # vavi-nio-file-ia
 
-<img src="https://github.com/umjammer/vavi-nio-file-ia/assets/493908/a0c4ed83-c95a-4bf9-ba15-5d664a68e22f" width="120" alt="Internet Archive logo"/>
+<img src="https://github.com/umjammer/vavi-nio-file-ia/assets/493908/f1fc4e74-aa22-4ed0-8383-1996748a1893" width="120" alt="Internet Archive logo"/>
 <sub><a href="https://archive.org/">© Internet Archive</a></sub>
 
 Java nio filesystem for Internet Archive.
