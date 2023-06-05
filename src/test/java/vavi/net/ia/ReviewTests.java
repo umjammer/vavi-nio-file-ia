@@ -1,7 +1,5 @@
 package vavi.net.ia;
 
-import java.io.IOException;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -15,84 +13,83 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class ReviewTests extends Base {
 
     @Test
-    public void ReadUpdateDeleteAsync() throws Exception {
-        String identifier = GetSharedTestIdentifierAsync();
+    public void readUpdateDelete() throws Exception {
+        String identifier = getSharedTestIdentifier();
 
+        // PRACTICE: this is not good flow, it's better to separate test file creation.
         try {
-            var ignore = _client.Reviews.GetAsync(identifier);
+            var ignore = client.reviews.get(identifier);
 
             // review already exists... clean up from previous test run
 
-            _client.Reviews.DeleteAsync(identifier);
-            WaitForServerAsync(identifier, 200, 3);
-        } catch (IOException ex) {
-            assertEquals(404 /*NotFound*/, Integer.parseInt(ex.getMessage())); // TODO
+            client.reviews.delete(identifier);
+            waitForServer(identifier, 200, 3);
+        } catch (Client.HttpException ex) {
+            assertEquals(404 /*NotFound*/, ex.statusCode);
         }
 
         // add a review
 
         Reviews.AddOrUpdateRequest addRequest = new Reviews.AddOrUpdateRequest();
-        addRequest.Title = "Title Text";
-        addRequest.Body = "Body text";
-        addRequest.Identifier = identifier;
-        addRequest.Stars = 3;
+        addRequest.title = "title Text";
+        addRequest.body = "body text";
+        addRequest.identifier = identifier;
+        addRequest.stars = 3;
 
-        var addResponse = _client.Reviews.AddOrUpdateAsync(addRequest);
+        var addResponse = client.reviews.addOrUpdate(addRequest);
         assertNotNull(addResponse);
-        assertTrue(addResponse.Success);
-        assertNotNull(addResponse.Value);
-        assertNotNull(addResponse.Value.TaskId);
-        Assertions.assertFalse(addResponse.Value.ReviewUpdated);
+        assertTrue(addResponse.success);
+        assertNotNull(addResponse.value);
+        assertNotNull(addResponse.value.taskId);
+        Assertions.assertFalse(addResponse.value.reviewUpdated);
 
-        WaitForServerAsync(identifier, 200, 3);
+        waitForServer(identifier, 200, 3);
 
-        var getResponse = _client.Reviews.GetAsync(identifier);
-        assertTrue(getResponse.Success);
-        assertNotNull(getResponse.Value);
-        assertEquals(addRequest.Title, getResponse.Value.Title);
-        assertEquals(addRequest.Body, getResponse.Value.Body);
-        assertEquals(addRequest.Stars, getResponse.Value.Stars);
-        assertNotNull(getResponse.Value.DateCreated);
-        assertNotNull(getResponse.Value.DateModified);
+        var getResponse = client.reviews.get(identifier);
+        assertTrue(getResponse.success);
+        assertNotNull(getResponse.value);
+        assertEquals(addRequest.title, getResponse.value.title);
+        assertEquals(addRequest.body, getResponse.value.body);
+        assertEquals(addRequest.stars, getResponse.value.stars);
+        assertNotNull(getResponse.value.dateCreated);
+        assertNotNull(getResponse.value.dateModified);
 
         // resend same review
         assertThrows(ServerResponseException.class, () -> {
-            var addResponse1 = _client.Reviews.AddOrUpdateAsync(addRequest);
+            var addResponse1 = client.reviews.addOrUpdate(addRequest);
             fail("Sending same review should not succeed");
         });
 
         // update review with new title
 
-        addRequest.Title = "New Title Text";
-        var addResponse2 = _client.Reviews.AddOrUpdateAsync(addRequest);
-        assertTrue(addResponse2.Value.ReviewUpdated);
+        addRequest.title = "New title Text";
+        var addResponse2 = client.reviews.addOrUpdate(addRequest);
+        assertTrue(addResponse2.value.reviewUpdated);
 
-        WaitForServerAsync(identifier, 200, 3);
+        waitForServer(identifier, 200, 3);
 
         // verify new title
 
-        var getResponse3 = _client.Reviews.GetAsync(identifier);
-        assertTrue(getResponse3.Success);
-        assertNotNull(getResponse3.Value);
-        assertEquals(addRequest.Title, getResponse3.Value.Title);
+        var getResponse3 = client.reviews.get(identifier);
+        assertTrue(getResponse3.success);
+        assertNotNull(getResponse3.value);
+        assertEquals(addRequest.title, getResponse3.value.title);
 
         // delete review
 
-        var deleteResponse = _client.Reviews.DeleteAsync(identifier);
+        var deleteResponse = client.reviews.delete(identifier);
         assertNotNull(deleteResponse);
-        assertTrue(deleteResponse.Success);
-        assertNotNull(deleteResponse.Value);
-        assertNotNull(deleteResponse.Value.TaskId);
+        assertTrue(deleteResponse.success);
+        assertNotNull(deleteResponse.value);
+        assertNotNull(deleteResponse.value.taskId);
 
-        WaitForServerAsync(identifier, 200, 3);
+        waitForServer(identifier, 200, 3);
 
         // verify delete
 
-        try {
-            var ignore = _client.Reviews.GetAsync(identifier);
-            fail("Failed to delete");
-        } catch (IOException ex) {
-            assertEquals(404, Integer.parseInt(ex.getMessage())); // TODO
-        }
+        Client.HttpException ex = assertThrows(Client.HttpException.class, () -> {
+            var ignore = client.reviews.get(identifier);
+        }, "Failed to delete");
+        assertEquals(404, ex.statusCode);
     }
 }

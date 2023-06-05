@@ -6,109 +6,104 @@ import java.net.http.HttpRequest;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
-import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.annotations.SerializedName;
 
 
 public class Reviews {
 
-    private static String Url(String identifier) {
-        return "https://archive.org/services/reviews.phpidentifier={identifier}";
+    private static String url(String identifier) {
+        return "https://archive.org/services/reviews.php?identifier=" + identifier;
     }
 
-    private final Client _client;
+    private final Client client;
 
     public Reviews(Client client) {
-        _client = client;
+        this.client = client;
     }
 
     public static class GetResponse extends ServerResponse {
 
-        public Value_ Value;
+        public Value_ value;
 
         public static class Value_ {
 
-            @JacksonXmlProperty(localName = "reviewtitle")
-            public String Title;
+            @SerializedName("reviewtitle")
+            public String title;
 
-            @JacksonXmlProperty(localName = "reviewbody")
-            public String Body;
+            @SerializedName("reviewbody")
+            public String body;
 
-            public String Reviewer;
+            public String reviewer;
 
-            @JacksonXmlProperty(localName = "reviewer_itemname")
-            public String ReviewerItemName;
+            @SerializedName("reviewer_itemname")
+            public String reviewerItemName;
 
-            @JacksonXmlProperty(localName = "createdate")
-            @JsonAdapter(LocalDateTimeNullableDeserializer.class)
-            public LocalDateTime DateCreated;
+            @SerializedName("createdate")
+            public LocalDateTime dateCreated;
 
-            @JacksonXmlProperty(localName = "reviewdate")
-            @JsonAdapter(LocalDateTimeNullableDeserializer.class)
-            public LocalDateTime DateModified;
+            @SerializedName("reviewdate")
+            public LocalDateTime dateModified;
 
-            //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-            public int Stars;
+            //@JsonAdapter(JsonConverters.NumberAdapter.class)
+            public int stars;
         }
     }
 
-    public GetResponse GetAsync(String identifier) throws IOException, InterruptedException {
-        var response = _client.<GetResponse>GetAsync(Url(identifier), null, GetResponse.class);
-        response.EnsureSuccess();
+    public GetResponse get(String identifier) throws IOException, InterruptedException {
+        var response = client.<GetResponse>get(url(identifier), null, GetResponse.class);
+        response.ensureSuccess();
         return response;
     }
 
     public static class AddOrUpdateResponse extends ServerResponse {
 
-        public Value_ Value;
+        public Value_ value;
 
         public static class Value_ {
 
-            @JacksonXmlProperty(localName = "task_id")
-            public long TaskId;
-            @JacksonXmlProperty(localName = "review_updated")
-            public boolean ReviewUpdated;
+            @SerializedName("task_id")
+            public long taskId;
+            @SerializedName("review_updated")
+            public boolean reviewUpdated;
         }
     }
 
     public static class AddOrUpdateRequest {
 
         @JsonIgnore
-        public String Identifier;
+        public String identifier;
 
-        public String Title;
-        public String Body;
-        public int Stars;
+        public String title;
+        public String body;
+        public int stars;
     }
 
-    public AddOrUpdateResponse AddOrUpdateAsync(AddOrUpdateRequest request) throws IOException, InterruptedException {
-        if (request.Identifier == null) throw new IllegalArgumentException("identifier required");
+    public AddOrUpdateResponse addOrUpdate(AddOrUpdateRequest request) throws IOException, InterruptedException {
+        if (request.identifier == null) throw new IllegalArgumentException("identifier required");
 
-        var response = _client.SendAsync("POST", Url(request.Identifier), request, AddOrUpdateResponse.class);
-        if (!response.Success) {
-            throw new IOException("AddOrUpdateAsync");
-        }
+        var response = client.send("POST", url(request.identifier), request, AddOrUpdateResponse.class);
+        response.ensureSuccess();
         return response;
     }
 
     public static class DeleteResponse extends ServerResponse {
 
-        public Value_ Value;
+        public Value_ value;
 
         public static class Value_ {
 
-            @JacksonXmlProperty(localName = "task_id")
-            public long TaskId;
+            @SerializedName("task_id")
+            public long taskId;
         }
     }
 
-    public DeleteResponse DeleteAsync(String identifier) throws IOException, InterruptedException {
+    public DeleteResponse delete(String identifier) throws IOException, InterruptedException {
         var httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(identifier))
+                .uri(URI.create(url(identifier)))
                 .DELETE();
 
-        var response = _client.SendAsync(httpRequest, DeleteResponse.class);
-        response.EnsureSuccess();
+        var response = client.send(httpRequest, DeleteResponse.class);
+        response.ensureSuccess();
         return response;
     }
 }

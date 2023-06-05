@@ -7,29 +7,32 @@ import vavi.util.properties.annotation.PropsEntity;
 @PropsEntity(url = "file:local.properties")
 class Config {
     @Property
-    public String LocalFilename = "test.txt";
+    public String localFilename = "src/test/resources/test.txt";
     @Property
-    public String RemoteFilename = "hello.txt";
+    public String remoteFilename = "hello.txt";
 
     @Property
-    public String TestItem = "";
-
-    public String TestList = "";
-
-    public String TestCollection = "";
+    public String testBucket = "";
 
     @Property
-    public String TestParent = "";
-    @Property
-    public String TestChild = "";
+    public String testItem = "file:test_item.txt";
+
+    public String testList = "";
+
+    public String testCollection = "";
 
     @Property
-    public String EmailAddress = "";
+    public String testParent = "";
     @Property
-    public String AccessKey = "";
-    @Property
-    public String SecretKey = "";
+    public String testChild = "";
 
     @Property
-    public boolean CanDelete;
+    public String emailAddress = "";
+    @Property
+    public String accessKey = "";
+    @Property
+    public String secretKey = "";
+
+    @Property
+    public boolean canDelete;
 }

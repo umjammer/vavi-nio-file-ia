@@ -2,76 +2,83 @@ package vavi.net.ia;
 
 import java.io.IOException;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 public class TaskTests extends Base {
 
     @Test
-    public void GetTasksAsync() throws IOException, InterruptedException {
+    public void getTasks() throws IOException, InterruptedException {
         var request = new Tasks.GetRequest();
-        request.Submitter = _config.EmailAddress;
-        var response = _client.Tasks.GetAsync(request);
+        request.submitter = config.emailAddress;
+        var response = client.tasks.get(request);
 
-        Assertions.assertTrue(response.Success);
+        assertTrue(response.success);
     }
 
     @Test
-    public void GetItemTaskAsync() throws Exception {
-        String identifier = GetSharedTestIdentifierAsync();
+    public void getItemTask() throws Exception {
+        String identifier = getSharedTestIdentifier();
 
         var request = new Tasks.GetRequest();
-        request.Identifier = identifier;
-        request.Catalog = true;
-        request.History = true;
-        var response = _client.Tasks.GetAsync(request);
+        request.identifier = identifier;
+        request.catalog = true;
+        request.history = true;
+        var response = client.tasks.get(request);
 
-        Assertions.assertNotNull(response);
-        Assertions.assertTrue(response.Success);
-        Assertions.assertNull(response.Cursor);
+        assertNotNull(response);
+        assertTrue(response.success);
+        assertNull(response.cursor);
 
-        Assertions.assertNotNull(response.Value);
-        Assertions.assertNotNull(response.Value.Summary);
-        Assertions.assertNotNull(response.Value.Summary.Error);
-        Assertions.assertNotNull(response.Value.Summary.Paused);
-        Assertions.assertNotNull(response.Value.Summary.Queued);
-        Assertions.assertNotNull(response.Value.Summary.Running);
+        assertNotNull(response.value);
+        assertNotNull(response.value.summary);
+        assertNotNull(response.value.summary.error);
+        assertNotNull(response.value.summary.paused);
+        assertNotNull(response.value.summary.queued);
+        assertNotNull(response.value.summary.running);
 
-        Assertions.assertNotNull(response.Value.History);
-        var history = response.Value.History.stream().findFirst().get();
+        assertNotNull(response.value.history);
+        var historyOption = response.value.history.stream().findFirst();
+        assertTrue(historyOption.isPresent());
 
-        Assertions.assertNotNull(history.Args);
-        Assertions.assertNotNull(history.Command);
-        Assertions.assertNotNull(history.DateSubmitted);
-        Assertions.assertNotNull(history.Finished);
-        Assertions.assertEquals(_config.TestItem, history.Identifier);
-        Assertions.assertNotNull(history.Priority);
-        Assertions.assertNotNull(history.Server);
-        Assertions.assertNotNull(history.Submitter);
-        Assertions.assertNotNull(history.TaskId);
+        var history = historyOption.get();
+
+        assertNotNull(history.args);
+        assertNotNull(history.command);
+        assertNotNull(history.dateSubmitted);
+        assertNotNull(history.finished);
+        assertEquals(identifier, history.identifier);
+        assertNotNull(history.priority);
+        assertNotNull(history.server);
+        assertNotNull(history.submitter);
+        assertNotNull(history.taskId);
     }
 
-    private static void ValidateSubmitResponse(Tasks.SubmitResponse response) {
-        Assertions.assertNotNull(response);
-        Assertions.assertTrue(response.Success);
-        Assertions.assertNotNull(response.Value);
-        Assertions.assertNotNull(response.Value.TaskId);
-        Assertions.assertNotNull(response.Value.Log);
+    private static void validateSubmitResponse(Tasks.SubmitResponse response) {
+        assertNotNull(response);
+        assertTrue(response.success);
+        assertNotNull(response.value);
+        assertNotNull(response.value.taskId);
+        assertNotNull(response.value.log);
     }
 
     @Test
-    public void DarkUndarkItemAsync() throws Exception {
-        String identifier = CreateTestItemAsync(null, null);
+    public void darkUndarkItem() throws Exception {
+        String identifier = createTestItem(null, null);
 
-        var response = _client.Tasks.MakeDarkAsync(identifier, "test item - please delete", null);
-        ValidateSubmitResponse(response);
+        var response = client.tasks.makeDark(identifier, "test item - please delete", null);
+        validateSubmitResponse(response);
 
-        WaitForServerAsync(identifier, 200, 3);
+        waitForServer(identifier, 200, 3);
 
-        response = _client.Tasks.MakeUndarkAsync(identifier, "test item - please delete", null);
-        ValidateSubmitResponse(response);
+        response = client.tasks.makeUndark(identifier, "test item - please delete", null);
+        validateSubmitResponse(response);
 
-        WaitForServerAsync(identifier, 200, 3);
+        waitForServer(identifier, 200, 3);
     }
 }

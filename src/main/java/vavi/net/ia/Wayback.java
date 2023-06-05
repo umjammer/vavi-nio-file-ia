@@ -3,96 +3,96 @@ package vavi.net.ia;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.annotations.SerializedName;
 
 
 public class Wayback {
 
-    private static final String Url = "https://archive.org/wayback/available";
-    private static final String CdxUrl = "https://web.archive.org/cdx/search/cdx";
+    private static final String url = "https://archive.org/wayback/available";
+    private static final String cdxUrl = "https://web.archive.org/cdx/search/cdx";
 
-    static final String DateFormat = "yyyyMMddHHmmss";
+    static final String dateFormat = "yyyyMMddHHmmss";
 
-    private final Client _client;
+    private final Client client;
 
     public Wayback(Client client) {
-        _client = client;
+        this.client = client;
     }
 
     public static class IsAvailableResponse {
 
-        @JacksonXmlProperty(localName = "available")
-        public boolean IsAvailable;
+        @SerializedName("available")
+        public boolean isAvailable;
 
-        public String Url;
+        public String url;
 
-        @JsonAdapter(WaybackOffsetDateTimeNullableDeserializer.class)
-        public OffsetDateTime Timestamp;
+        @JsonAdapter(JsonConverters.WaybackZonedDateTimeNullableConverter.class)
+        public ZonedDateTime timestamp;
 
-        @JsonAdapter(NullableStringToIntDeserializer.class)
-        public int Status;
+        @JsonAdapter(JsonConverters.NullableStringToIntConverter.class)
+        public int status;
     }
 
     static class WaybackResponse {
 
-        @JacksonXmlProperty(localName = "archived_snapshots")
-        public ArchivedSnapshots_ ArchivedSnapshots;
+        @SerializedName("archived_snapshots")
+        public ArchivedSnapshots_ archivedSnapshots;
 
         static class ArchivedSnapshots_ {
 
-            @JacksonXmlProperty(localName = "closest")
-            public IsAvailableResponse IsAvailableResponse;
+            @SerializedName("closest")
+            public IsAvailableResponse isAvailableResponse;
         }
     }
 
-    public IsAvailableResponse IsAvailable(String url, LocalDate timestamp/* = null*/) throws Exception {
+    public IsAvailableResponse isAvailable(String url, LocalDateTime timestamp/* = null*/) throws Exception {
         Map<String, String> query = new HashMap<>();
         query.put("url", url);
-        if (timestamp != null) query.put("timestamp", timestamp.toString());
+        if (timestamp != null) query.put("timestamp", timestamp.format(DateTimeFormatter.ofPattern(dateFormat)));
 
-        WaybackResponse response = _client.GetAsync(Url, query, WaybackResponse.class);
-        IsAvailableResponse b = response.ArchivedSnapshots.IsAvailableResponse;
+        WaybackResponse response = client.get(Wayback.url, query, WaybackResponse.class);
+        IsAvailableResponse b = response.archivedSnapshots.isAvailableResponse;
         return b != null ? b : new IsAvailableResponse();
     }
 
     static class SearchRequest {
 
-        public String Url;
-        public LocalDateTime StartTime;
-        public LocalDateTime EndTime;
-        public String MatchType;
-        public String Collapse;
-        public Integer Limit;
-        public Integer Offset;
-        public Integer Page;
-        public Integer PageSize;
-        public boolean FastLatest;
-        public String ResumeKey;
+        public String url;
+        public LocalDateTime startTime;
+        public LocalDateTime endTime;
+        public String matchType;
+        public String collapse;
+        public Integer limit;
+        public Integer offset;
+        public Integer page;
+        public Integer pageSize;
+        public boolean fastLatest;
+        public String resumeKey;
 
-        private Map<String, String> ToQuery() {
-            if (Url == null) throw new IllegalArgumentException("Url is required");
+        private Map<String, String> toQuery() {
+            if (url == null) throw new IllegalArgumentException("url is required");
             Map<String, String> query = new HashMap<>();
-            query.put("url", Url);
+            query.put("url", url);
             query.put("showResumeKey", "true");
 
-            if (StartTime != null) query.put("from", StartTime.format(DateTimeFormatter.ofPattern(DateFormat)));
-            if (EndTime != null) query.put("to", EndTime.format(DateTimeFormatter.ofPattern(DateFormat)));
-            if (MatchType != null) query.put("matchType", MatchType);
-            if (Collapse != null) query.put("collapse", Collapse);
-            if (Limit != null) query.put("limit", String.valueOf(Limit));
-            if (Offset != null) query.put("offset", String.valueOf(Offset));
-            if (Page != null) query.put("page", String.valueOf(Page));
-            if (PageSize != null) query.put("pageSize", String.valueOf(PageSize));
-            if (FastLatest) query.put("fastLatest", "true");
-            if (ResumeKey != null) query.put("resumeKey", ResumeKey);
+            if (startTime != null) query.put("from", startTime.format(DateTimeFormatter.ofPattern(dateFormat)));
+            if (endTime != null) query.put("to", endTime.format(DateTimeFormatter.ofPattern(dateFormat)));
+            if (matchType != null) query.put("matchType", matchType);
+            if (collapse != null) query.put("collapse", collapse);
+            if (limit != null) query.put("limit", String.valueOf(limit));
+            if (offset != null) query.put("offset", String.valueOf(offset));
+            if (page != null) query.put("page", String.valueOf(page));
+            if (pageSize != null) query.put("pageSize", String.valueOf(pageSize));
+            if (fastLatest) query.put("fastLatest", "true");
+            if (resumeKey != null) query.put("resumeKey", resumeKey);
 
             return query;
         }
@@ -100,23 +100,23 @@ public class Wayback {
 
     static class SearchResponse {
 
-        public List<CdxResponse> Results = new ArrayList<>();
-        public String ResumeKey;
+        public List<CdxResponse> results = new ArrayList<>();
+        public String resumeKey;
 
         static class CdxResponse {
 
-            public String UrlKey = null;
-            public LocalDateTime Timestamp;
-            public String Original = null;
-            public String MimeType = null;
-            public int StatusCode;
-            public String Digest = null;
-            public long Length;
+            public String urlKey = null;
+            public LocalDateTime timestamp;
+            public String original = null;
+            public String mimeType = null;
+            public int statusCode;
+            public String digest = null;
+            public long length;
         }
     }
 
-    public SearchResponse SearchAsync(SearchRequest request) throws IOException, InterruptedException {
-        var result = _client.<String>GetAsync(CdxUrl, request.ToQuery(), String.class);
+    public SearchResponse search(SearchRequest request) throws IOException, InterruptedException {
+        var result = client.get(cdxUrl, request.toQuery(), String.class);
         var response = new SearchResponse();
 
         boolean lastLine = false;
@@ -127,7 +127,7 @@ public class Wayback {
             }
 
             if (lastLine) {
-                response.ResumeKey = line;
+                response.resumeKey = line;
                 break;
             }
 
@@ -135,32 +135,32 @@ public class Wayback {
             if (fields.length != 7) throw new IllegalStateException("Unexpected number of fields returned from server");
 
             var cdxResponse = new SearchResponse.CdxResponse();
-            cdxResponse.UrlKey = fields[0];
-            cdxResponse.Timestamp = LocalDateTime.parse(fields[1], DateTimeFormatter.ofPattern(DateFormat));
-            cdxResponse.Original = fields[2];
-            cdxResponse.MimeType = fields[3];
-            cdxResponse.Digest = fields[5];
-            cdxResponse.Length = Long.parseLong(fields[6]);
+            cdxResponse.urlKey = fields[0];
+            cdxResponse.timestamp = LocalDateTime.parse(fields[1], DateTimeFormatter.ofPattern(dateFormat));
+            cdxResponse.original = fields[2];
+            cdxResponse.mimeType = fields[3];
+            cdxResponse.digest = fields[5];
+            cdxResponse.length = Long.parseLong(fields[6]);
 
             try {
                 var statusCode = Integer.parseInt(fields[4]);
-                cdxResponse.StatusCode = statusCode; // can be "-"
+                cdxResponse.statusCode = statusCode; // can be "-"
             } catch (NumberFormatException e) {
                 e.printStackTrace();
             }
-            response.Results.add(cdxResponse);
+            response.results.add(cdxResponse);
         }
 
         return response;
     }
 
-    public Integer GetNumPagesAsync(String url) throws IOException, InterruptedException {
+    public Integer getNumPages(String url) throws IOException, InterruptedException {
         var sr = new SearchRequest();
-        sr.Url = url;
-        var query = sr.ToQuery();
+        sr.url = url;
+        var query = sr.toQuery();
         query.put("showNumPages", "true");
 
-        var response = _client.GetAsync(CdxUrl, query, String.class);
+        var response = client.get(cdxUrl, query, String.class).trim();
         return Integer.parseInt(response);
     }
 }

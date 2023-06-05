@@ -1,6 +1,7 @@
 package vavi.net.ia;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -10,51 +11,51 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class ChangeTests extends Base {
 
-    private static final int _pageSize = 50000;
+    private static final int pageSize = 50000;
 
-    private static String ValidateResponse(Changes.GetResponse response, Integer countExpected/* = null*/) {
+    private static String validateResponse(Changes.GetResponse response, Integer countExpected/* = null*/) {
         assertNotNull(response);
-        assertNotNull(response.Token);
+        assertNotNull(response.token);
 
-        assertNotNull(response.Changes);
+        assertNotNull(response.changes);
 
         if (countExpected != null) {
-            Assertions.assertEquals(countExpected, response.Changes.size());
+            Assertions.assertEquals(countExpected, response.changes.size());
         }
 
-        return response.Token;
+        return response.token;
     }
 
     @Test
-    public void GetAsync() throws Exception {
-        Changes.GetResponse response = _client.Changes.GetAsync(LocalDate.of(2021, 1, 1));
-        String token = ValidateResponse(response, _pageSize);
+    public void get() throws Exception {
+        Changes.GetResponse response = client.changes.get(LocalDateTime.of(2021, 1, 1, 0, 0));
+        String token = validateResponse(response, pageSize);
 
-        response = _client.Changes.GetAsync(token);
-        ValidateResponse(response, _pageSize);
+        response = client.changes.get(token);
+        validateResponse(response, pageSize);
 
-        response = _client.Changes.GetAsync(LocalDate.of(2021, 1, 1));
-        token = ValidateResponse(response, _pageSize);
+        response = client.changes.get(LocalDate.of(2021, 1, 1));
+        token = validateResponse(response, pageSize);
 
-        response = _client.Changes.GetAsync(token);
-        ValidateResponse(response, _pageSize);
+        response = client.changes.get(token);
+        validateResponse(response, pageSize);
     }
 
     @Test
-    public void GetFromBeginningAsync() throws Exception {
-        Changes.GetResponse response = _client.Changes.GetFromBeginningAsync();
-        String token = ValidateResponse(response, _pageSize);
+    public void getFromBeginning() throws Exception {
+        Changes.GetResponse response = client.changes.getFromBeginning();
+        String token = validateResponse(response, pageSize);
 
-        response = _client.Changes.GetAsync(token);
-        ValidateResponse(response, _pageSize);
+        response = client.changes.get(token);
+        validateResponse(response, pageSize);
     }
 
     @Test
-    public void GetStartingNowAsync() throws Exception {
-        Changes.GetResponse response = _client.Changes.GetStartingNowAsync();
-        String token = ValidateResponse(response, 0);
+    public void getStartingNow() throws Exception {
+        Changes.GetResponse response = client.changes.getStartingNow();
+        String token = validateResponse(response, 0);
 
-        response = _client.Changes.GetAsync(token);
-        ValidateResponse(response, null);
+        response = client.changes.get(token);
+        validateResponse(response, null);
     }
 }

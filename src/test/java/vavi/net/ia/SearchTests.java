@@ -9,25 +9,47 @@ import org.junit.jupiter.api.Test;
 public class SearchTests extends Base {
 
     @Test
-    public void ScrapeAsync() throws Exception {
+    public void scrape() throws Exception {
         var request = new Search.ScrapeRequest() {{
-            Query = "scanimate";
-            Fields = List.of("identifier", "title", "description");
-            Sorts = List.of("title");
+            query = "scanimate";
+            fields = List.of("identifier", "title", "description");
+            sorts = List.of("title");
         }};
 
-        var response = _client.Search.ScrapeAsync(request);
+        var response = client.search.scrape(request);
         Assertions.assertNotNull(response);
-        Assertions.assertNotNull(response.Count);
-        Assertions.assertNotNull(response.Total);
+        Assertions.assertNotNull(response.count);
+        Assertions.assertNotNull(response.total);
 
-        Assertions.assertEquals(response.Count, response.Total);
-        Assertions.assertNull(response.Cursor);
+        Assertions.assertEquals((long) response.count, response.total);
+        Assertions.assertNull(response.cursor);
 
-        Assertions.assertEquals(response.Count, response.Items.size());
+        Assertions.assertEquals(response.count, response.items.size());
 
-        var json = _client.Search.ScrapeAsJsonAsync(request);
+        var json = client.search.scrapeAsJson(request);
         var count = json.get("count").getAsInt();
-        Assertions.assertEquals(response.Count, count);
+        Assertions.assertEquals(response.count, count);
+    }
+
+    @Test
+    public void test() throws Exception {
+        var request = new Search.ScrapeRequest() {{
+            query = "@vavivavi";
+            fields = List.of("identifier", "title", "date", "item_size");
+            sorts = List.of("title");
+        }};
+
+        var response = client.search.scrape(request);
+        response.items.forEach(i -> {
+            System.err.printf("%20s %20s %8s %s%n", abbr(i.identifier, 20), abbr(i.title, 20), i.itemSize, i.date);
+        });
+    }
+
+    String abbr(String s, int l) {
+        if (s.length() > 3 && s.length() > l) {
+            return s.substring(0, s.length() - 3) + "...";
+        } else {
+            return s;
+        }
     }
 }

@@ -2,70 +2,71 @@ package vavi.net.ia;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
-import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.annotations.SerializedName;
 
 
+/**
+ * @see "https://archive.org/developers/tasks.html"
+ */
 public class Tasks {
 
-    private final String Url = "https://archive.org/services/tasks.php";
-    private final String LogUrl = "https://catalogd.archive.org/services/tasks.php";
+    private final String url = "https://archive.org/services/tasks.php";
+    private final String logUrl = "https://catalogd.archive.org/services/tasks.php";
 
-    private final Client _client;
+    private final Client client;
 
     public Tasks(Client client) {
-        _client = client;
+        this.client = client;
     }
 
     public static class GetResponse extends ServerResponse {
 
-        public Value_ Value;
+        public Value_ value;
 
         public static class Value_ {
 
             public static class Summary_ {
 
-                public int Queued;
-                public int Running;
-                public int Error;
-                public int Paused;
+                public Integer queued;
+                public Integer running;
+                public Integer error;
+                public Integer paused;
             }
 
-            public Summary_ Summary;
+            public Summary_ summary;
 
             public static class HistoryEntry {
 
-                public String Identifier;
+                public String identifier;
 
-                @JacksonXmlProperty(localName = "task_id")
-                public long TaskId;
+                @SerializedName("task_id")
+                public Long taskId;
 
-                public String Server;
+                public String server;
 
-                @JacksonXmlProperty(localName = "cmd")
-                public String Command;
+                @SerializedName("cmd")
+                public String command;
 
-                public Map<String, String> Args = new HashMap<>();
+                public Map<String, String> args = new HashMap<>();
 
-                @JsonAdapter(LocalDateTimeNullableDeserializer.class)
-                @JacksonXmlProperty(localName = "submittime")
-                public LocalDateTime DateSubmitted;
+                @SerializedName("submittime")
+                public LocalDateTime dateSubmitted;
 
-                public String Submitter;
-                public int Priority;
+                public String submitter;
+                public Integer priority;
 
-                public long Finished; // not a Unix timestamp
+                public Long finished; // not a Unix timestamp
             }
 
-            public List<HistoryEntry> History;
+            public List<HistoryEntry> history;
         }
 
-        public String Cursor;
+        public String cursor;
     }
 
     public enum SubmitTimeType {
@@ -77,65 +78,60 @@ public class Tasks {
 
     public static class GetRequest {
 
-        public String Identifier;
-        public Long TaskId;
-        public String Server;
-        public String Command;
-        public String Args;
-        public String Submitter;
-        public Integer Priority;
-        public Integer WaitAdmin;
-        public SubmitTimeType SubmitTimeType;
-        public OffsetDateTime SubmitTime;
-        public boolean Summary = true;
-        public boolean Catalog;
-        public boolean History;
-        public int Limit;
+        public String identifier;
+        public Long taskId;
+        public String server;
+        public String command;
+        public String args;
+        public String submitter;
+        public Integer priority;
+        public Integer waitAdmin;
+        public SubmitTimeType submitTimeType;
+        public LocalDateTime submitTime;
+        public boolean summary = true;
+        public boolean catalog;
+        public boolean history;
+        public int limit;
     }
 
-    public GetResponse GetAsync(GetRequest request) throws IOException, InterruptedException {
+    public GetResponse get(GetRequest request) throws IOException, InterruptedException {
         Map<String, String> query = new HashMap<>();
 
-        if (request.Identifier != null) query.put("identifier", request.Identifier);
-        if (request.TaskId != null) query.put("task_id", String.valueOf(request.TaskId));
-        if (request.Server != null) query.put("server", request.Server);
-        if (request.Command != null) query.put("cmd", request.Command);
-        if (request.Args != null) query.put("args", request.Args);
-        if (request.Submitter != null) query.put("submitter", request.Submitter);
-        if (request.Priority != null) query.put("priority", String.valueOf(request.Priority));
-        if (request.WaitAdmin != null) query.put("wait_admin", String.valueOf(request.WaitAdmin));
+        if (request.identifier != null) query.put("identifier", request.identifier);
+        if (request.taskId != null) query.put("task_id", String.valueOf(request.taskId));
+        if (request.server != null) query.put("server", request.server);
+        if (request.command != null) query.put("cmd", request.command);
+        if (request.args != null) query.put("args", request.args);
+        if (request.submitter != null) query.put("submitter", request.submitter);
+        if (request.priority != null) query.put("priority", String.valueOf(request.priority));
+        if (request.waitAdmin != null) query.put("wait_admin", String.valueOf(request.waitAdmin));
 
-        String submitTimeType = null;
-        switch (request.SubmitTimeType) {
-        case GreaterThan:
-            submitTimeType = ">";
-            break;
-        case GreaterThanOrEqual:
-            submitTimeType = ">=";
-            break;
-        case LessThan:
-            submitTimeType = "<";
-            break;
-        case LessThanOrEqual:
-            submitTimeType = "<=";
-            break;
-        default:
-            throw new IllegalArgumentException("Unexpected SubmitTimeType: " + request.SubmitTimeType);
+        String submitTimeType;
+        if (request.submitTimeType != null) {
+            submitTimeType = switch (request.submitTimeType) {
+                case GreaterThan -> ">";
+                case GreaterThanOrEqual -> ">=";
+                case LessThan -> "<";
+                case LessThanOrEqual -> "<=";
+                default -> throw new IllegalArgumentException("Unexpected submitTimeType: " + request.submitTimeType);
+            };
+        } else {
+            submitTimeType = null;
         }
 
-        if (request.SubmitTime != null && submitTimeType == null)
-            throw new IllegalArgumentException("Must specify a SubmitTimeType");
-        if (submitTimeType != null && request.SubmitTime == null)
-            throw new IllegalArgumentException("Specified a SubmitTimeType but no SubmitTime");
-        if (request.SubmitTime != null)
-            query.put("submittime" + submitTimeType, request.SubmitTime.toString());
+        if (request.submitTime != null && submitTimeType == null)
+            throw new IllegalArgumentException("Must specify a submitTimeType");
+        if (submitTimeType != null && request.submitTime == null)
+            throw new IllegalArgumentException("Specified a submitTimeType but no submitTime");
+        if (request.submitTime != null)
+            query.put("submittime" + submitTimeType, request.submitTime.toString());
 
-        if (!request.Summary) query.put("summary", "0");
-        if (request.Catalog) query.put("catalog", "1");
-        if (request.History) query.put("history", "1");
+        if (!request.summary) query.put("summary", "0");
+        if (request.catalog) query.put("catalog", "1");
+        if (request.history) query.put("history", "1");
 
-        GetResponse response = _client.GetAsync(Url, query, GetResponse.class);
-        response.EnsureSuccess();
+        GetResponse response = client.get(url, query, GetResponse.class);
+        response.ensureSuccess();
         return response;
     }
 
@@ -150,31 +146,32 @@ public class Tasks {
         Rename
     }
 
+    /** @see "https://archive.org/developers/tasks.html#request-entity" */
     private static class SubmitRequest {
 
-        public String Identifier;
+        public String identifier;
 
-        @JacksonXmlProperty(localName = "cmd")
-        public String Command;
+        @SerializedName("cmd")
+        public String command;
 
-        public Map<String, String> Args;
-        public Integer Priority;
+        public Map<String, String> args;
+        public Integer priority;
     }
 
     public static class SubmitResponse extends ServerResponse {
 
-        public Value_ Value;
+        public Value_ value;
 
         public static class Value_ {
 
-            @JacksonXmlProperty(localName = "task_id")
-            public long TaskId;
+            @SerializedName("task_id")
+            public Long taskId;
 
-            public String Log;
+            public String log;
         }
     }
 
-    private static final Map<Command, String> _submitCommands = new HashMap<>() {{
+    private static final Map<Command, String> submitCommands = new HashMap<>() {{
         put(Command.BookOp, "book_op.php");
         put(Command.Backup, "bup.php");
         put(Command.Delete, "delete.php");
@@ -185,7 +182,7 @@ public class Tasks {
         put(Command.Rename, "rename.php");
     }};
 
-    public SubmitResponse SubmitAsync(String identifier, Command command, Map<String, String> args/*=null*/, Integer priority/*=null*/) throws IOException, InterruptedException {
+    public SubmitResponse submit(String identifier, Command command, Map<String, String> args/*=null*/, Integer priority/*=null*/) throws IOException, InterruptedException {
         if (args == null) {
             switch (command) {
             case MakeDark, MakeUndark, Rename ->
@@ -195,83 +192,83 @@ public class Tasks {
         }
 
         SubmitRequest request = new SubmitRequest();
-        request.Identifier = identifier;
-        request.Command = _submitCommands.get(command);
-        request.Args = args;
-        request.Priority = priority;
+        request.identifier = identifier;
+        request.command = submitCommands.get(command);
+        request.args = args;
+        request.priority = priority;
 
-        SubmitResponse response = _client.SendAsync("POST", Url, request, SubmitResponse.class);
-        response.EnsureSuccess();
+        SubmitResponse response = client.send("POST", url, request, SubmitResponse.class);
+        response.ensureSuccess();
         return response;
     }
 
     // These tasks require additional parameters so we add helper methods to make them more discoverable
     // https://archive.org/services/docs/api/tasks.html
 
-    public SubmitResponse RenameAsync(String identifier, String newIdentifier, Integer priority/* = null*/) throws IOException, InterruptedException {
+    public SubmitResponse rename(String identifier, String newIdentifier, Integer priority/* = null*/) throws IOException, InterruptedException {
         Map<String, String> map = new HashMap<>();
         map.put("new_identifier", newIdentifier);
-        return SubmitAsync(identifier, Command.Rename, map, priority);
+        return submit(identifier, Command.Rename, map, priority);
     }
 
-    public SubmitResponse MakeDarkAsync(String identifier, String comment, Integer priority/* = null*/) throws IOException, InterruptedException {
+    public SubmitResponse makeDark(String identifier, String comment, Integer priority/* = null*/) throws IOException, InterruptedException {
         Map<String, String> map = new HashMap<>();
-        map.put("new_identifier", comment);
-        return SubmitAsync(identifier, Command.MakeDark, map, priority);
+        map.put("comment", comment);
+        return submit(identifier, Command.MakeDark, map, priority);
     }
 
-    public SubmitResponse MakeUndarkAsync(String identifier, String comment, Integer priority/* = null*/) throws IOException, InterruptedException {
+    public SubmitResponse makeUndark(String identifier, String comment, Integer priority/* = null*/) throws IOException, InterruptedException {
         Map<String, String> map = new HashMap<>();
-        map.put("new_identifier", comment);
-        return SubmitAsync(identifier, Command.MakeUndark, map, priority);
+        map.put("comment", comment);
+        return submit(identifier, Command.MakeUndark, map, priority);
     }
 
     public static class RateLimitResponse extends ServerResponse {
 
-        public Value_ Value;
+        public Value_ value;
 
         public static class Value_ {
 
-            @JacksonXmlProperty(localName = "cmd")
-            public String Command = "";
+            @SerializedName("cmd")
+            public String command = "";
 
-            @JacksonXmlProperty(localName = "task_limits")
-            public int TaskLimits;
+            @SerializedName("task_limits")
+            public int taskLimits;
 
-            @JacksonXmlProperty(localName = "tasks_inflight")
-            public int TaskInFlight;
+            @SerializedName("tasks_inflight")
+            public int taskInFlight;
 
-            @JacksonXmlProperty(localName = "tasks_blocked_by_offline")
-            public int TasksBlockedByOffline;
+            @SerializedName("tasks_blocked_by_offline")
+            public int tasksBlockedByOffline;
         }
     }
 
-    public RateLimitResponse GetRateLimitAsync(Command command) throws IOException, InterruptedException {
+    public RateLimitResponse getRateLimit(Command command) throws IOException, InterruptedException {
         Map<String, String> query = new HashMap<>();
         query.put("rate_limits", "1");
         query.put("cmd", command.toString());
 
-        RateLimitResponse response = _client.<RateLimitResponse>GetAsync(Url, query, RateLimitResponse.class);
-        response.EnsureSuccess();
+        RateLimitResponse response = client.get(url, query, RateLimitResponse.class);
+        response.ensureSuccess();
         return response;
     }
 
     public static class RerunRequest {
 
-        public String Op = "rerun";
-        public long TaskId;
+        public String op = "rerun";
+        public long taskId;
     }
 
     public static class RerunResponse extends ServerResponse {
 
-        public Map<String, Object> Value = new HashMap<>();
+        public Map<String, Object> value = new HashMap<>();
     }
 
-    public RerunResponse RerunAsync(long taskId) throws IOException, InterruptedException {
+    public RerunResponse rerun_(long taskId) throws IOException, InterruptedException {
         RerunRequest request = new RerunRequest();
-        request.TaskId = taskId;
-        RerunResponse response = _client.<RerunResponse>SendAsync("PUT", Url, request, RerunResponse.class);
-        response.EnsureSuccess();
+        request.taskId = taskId;
+        RerunResponse response = client.send("PUT", url, request, RerunResponse.class);
+        response.ensureSuccess();
         return response;
     }
 
@@ -289,22 +286,22 @@ public class Tasks {
 
     public static class GetLogRequest {
 
-        @JacksonXmlProperty(localName = "identifier")
-        public String Identifier;
+        @SerializedName("identifier")
+        public String identifier;
 
-        @JacksonXmlProperty(localName = "cmd")
-        public int Command;
+        @SerializedName("cmd")
+        public int command;
 
-        @JacksonXmlProperty(localName = "args")
-        public Map<String, String> Args = new HashMap<>();
+        @SerializedName("args")
+        public Map<String, String> args = new HashMap<>();
 
-        @JacksonXmlProperty(localName = "priority")
-        public int Priority = 0;
+        @SerializedName("priority")
+        public int priority = 0;
     }
 
-    public GetLogRequest GetLogAsync(long taskId) throws IOException, InterruptedException {
+    public GetLogRequest getLog(long taskId) throws IOException, InterruptedException {
         Map<String, String> query = new HashMap<>();
         query.put("task_log", String.valueOf(taskId));
-        return _client.GetAsync(LogUrl, query, GetLogRequest.class);
+        return client.get(logUrl, query, GetLogRequest.class);
     }
 }

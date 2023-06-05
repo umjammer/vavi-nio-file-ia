@@ -7,7 +7,6 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,90 +20,91 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
+import com.google.gson.annotations.SerializedName;
 import vavi.net.ia.dotnet.KeyValuePair;
 import vavi.util.ByteUtil;
+import vavi.util.Debug;
 
 
 public class Item {
 
-    private final String Url = "https://s3.us.archive.org";
+    private static final String url = "https://s3.us.archive.org";
 
-    private Client _client;
+    private Client client;
 
     public Item(Client client) {
-        _client = client;
+        this.client = client;
     }
 
     public static class PutRequest {
 
-        public String Bucket;
+        public String bucket;
 
-        public Path LocalPath;
+        public Path localPath;
 
-        public SeekableByteChannel SourceStream;
+        public SeekableByteChannel sourceStream;
 
-        public String RemoteFilename;
+        public String remoteFilename;
 
-        public List<KeyValuePair<String, Object>> Metadata = new ArrayList<>();
+        public List<KeyValuePair<String, Object>> metadata = new ArrayList<>();
 
-        public boolean CreateBucket;
+        public boolean createBucket;
 
-        public boolean NoDerive;
+        public boolean noDerive;
 
-        public boolean KeepOldVersion;
+        public boolean keepOldVersion;
 
-        public boolean DeleteExistingMetadata;
+        public boolean deleteExistingMetadata;
 
-        public long MultipartUploadMinimumSize = 1024 * 1024 * 300; // use multipart for files over 300 MB
-        public int MultipartUploadChunkSize = 1024 * 1024 * 200; // upload in 200 MB chunks
-        public int MultipartUploadThreadCount = 3; // three simultaneous uploads
-        List<Integer> MultipartUploadSkipParts = new ArrayList<>(); // for testing
+        public long multipartUploadMinimumSize = 1024 * 1024 * 300; // use multipart for files over 300 MB
+        public int multipartUploadChunkSize = 1024 * 1024 * 200; // upload in 200 MB chunks
+        public int multipartUploadThreadCount = 3; // three simultaneous uploads
+        List<Integer> multipartUploadSkipParts = new ArrayList<>(); // for testing
 
-        public String SimulateError;
+        public String simulateError;
 
-        boolean HasFilename() {
-            return RemoteFilename != null || LocalPath != null;
+        boolean hasFilename() {
+            return remoteFilename != null || localPath != null;
         }
 
-        String Filename() {
-            return Filename(true);
+        String filename() {
+            return filename(true);
         }
 
-        String Filename(boolean encoded) {
-            if (RemoteFilename != null) {
-                return RemoteFilename;
+        String filename(boolean encoded) {
+            if (remoteFilename != null) {
+                return remoteFilename;
             } else {
-                Path filename = LocalPath.getFileName();
+                Path filename = localPath.getFileName();
                 if (filename != null)
-                    return encoded ? Encode(filename.toString()) : filename.toString();
+                    return encoded ? encode(filename.toString()) : filename.toString();
                 else
-                    throw new IllegalStateException("RemoteFilename or LocalPath required");
+                    throw new IllegalStateException("remoteFilename or localPath required");
             }
         }
+
+        private static String encode(String s) {
+            // UrlEncode replaces spaces so we use this instead:
+            return s.replace(";", "%3b").replace("#", "%23");
+        }
     }
 
-    private static String Encode(String s) {
-        // UrlEncode replaces spaces so we use this instead:
-        return s.replace(";", "%3b").replace("#", "%23");
+    public HttpResponse<?> put(PutRequest request) throws IOException, InterruptedException {
+        return put(request, 0);
     }
 
-    public HttpResponse<?> PutAsync(PutRequest request) throws IOException, InterruptedException {
-        return PutAsync(request, 0);
-    }
-
-    public HttpResponse<?> PutAsync(PutRequest request, int timeout) throws IOException, InterruptedException {
-        if (request.Bucket == null) throw new IllegalArgumentException("A Bucket identifier required");
+    public HttpResponse<?> put(PutRequest request, int timeout) throws IOException, InterruptedException {
+        if (request.bucket == null) throw new IllegalArgumentException("A bucket identifier required");
 
         SeekableByteChannel sourceStream = null;
 
@@ -112,57 +112,58 @@ public class Item {
             HttpRequest.Builder uploadRequest = HttpRequest.newBuilder();
             boolean isMultipartUpload = false;
 
-            Path fileInfo = null;
             HttpRequest.BodyPublisher content = null;
 
-            if (request.HasFilename()) {
-                if (request.SourceStream == null && request.LocalPath == null)
-                    throw new IllegalArgumentException("A SourceStream or LocalPath is required");
+            if (request.hasFilename()) {
+                if (request.sourceStream == null && request.localPath == null)
+                    throw new IllegalArgumentException("A sourceStream or localPath is required");
 
-                sourceStream = request.SourceStream == null ? Files.newByteChannel(request.LocalPath) : request.SourceStream;
-                if (sourceStream.size() >= request.MultipartUploadMinimumSize) isMultipartUpload = true;
+                sourceStream = request.sourceStream == null ? Files.newByteChannel(request.localPath) : request.sourceStream;
+                if (sourceStream.size() >= request.multipartUploadMinimumSize) isMultipartUpload = true;
 
-                uploadRequest.uri(URI.create(String.format("%s/%s/%s%s", Url, request.Bucket, request.Filename(), isMultipartUpload ? "?uploads" : "")));
-                uploadRequest.header("x-archive-size-hint", String.valueOf(Files.size(fileInfo)));
+                uploadRequest.uri(URI.create(String.format("%s/%s/%s%s", url, request.bucket, request.filename().replace(" ", "+"), isMultipartUpload ? "?uploads" : "")));
+                uploadRequest.header("x-archive-size-hint", String.valueOf(sourceStream.size()));
 
                 if (!isMultipartUpload) {
-                    SeekableByteChannel sbc = sourceStream;
-                    content = HttpRequest.BodyPublishers.ofInputStream(() -> Channels.newInputStream(sbc));
+                    ByteBuffer bb = ByteBuffer.allocate((int) sourceStream.size());
+                    sourceStream.read(bb);
+Debug.println(Level.FINER, "sourceStream: " + sourceStream.size());
+                    content = HttpRequest.BodyPublishers.ofByteArray(bb.array());
 
                     try {
                         var md5 = MessageDigest.getInstance("MD5");
-                        md5.update(Files.readAllBytes(fileInfo));
+                        md5.update(bb.array());
                         uploadRequest.header("ContentMD5", ByteUtil.toHexString(md5.digest()));
                     } catch (NoSuchAlgorithmException e) {
                         throw new RuntimeException(e);
                     }
                 }
             } else {
-                uploadRequest.uri(URI.create(Url + "/" + request.Bucket));
+                uploadRequest.uri(URI.create(url + "/" + request.bucket));
             }
 
-            AddMetadata(uploadRequest, request.Metadata);
+            addMetadata(uploadRequest, request.metadata);
 
-            if (request.CreateBucket) uploadRequest.header("x-archive-auto-make-bucket", "1");
-            if (request.KeepOldVersion) uploadRequest.header("x-archive-keep-old-version", "1");
-            if (request.NoDerive) uploadRequest.header("x-archive-queue-derive", "0");
-            if (request.DeleteExistingMetadata)
+            if (request.createBucket) uploadRequest.header("x-archive-auto-make-bucket", "1");
+            if (request.keepOldVersion) uploadRequest.header("x-archive-keep-old-version", "1");
+            if (request.noDerive) uploadRequest.header("x-archive-queue-derive", "0");
+            if (request.deleteExistingMetadata)
                 uploadRequest.header("x-archive-ignore-preexisting-bucket", "1");
-            if (request.SimulateError != null)
-                uploadRequest.header("x-archive-simulate-error", request.SimulateError);
+            if (request.simulateError != null)
+                uploadRequest.header("x-archive-simulate-error", request.simulateError);
 
             if (!isMultipartUpload) {
-                uploadRequest.method("PUT", content);
-                return _client.SendAsync(uploadRequest, HttpResponse.class);
+                uploadRequest.PUT(content);
+                return client.send(uploadRequest, HttpResponse.class);
             } else {
-                return MultipartUpload(request, sourceStream, uploadRequest);
+                return multipartUpload(request, sourceStream, uploadRequest);
             }
         } finally {
             if (sourceStream != null) sourceStream.close();
         }
     }
 
-    static void AddMetadata(HttpRequest.Builder httpRequest, List<KeyValuePair<String, Object>> metadata) throws IOException {
+    static void addMetadata(HttpRequest.Builder httpRequest, List<KeyValuePair<String, Object>> metadata) throws IOException {
         for (var group : metadata.stream().collect(Collectors.groupingBy(KeyValuePair::getKey)).entrySet()) {
             int count = 0;
             for (var kv : group.getValue()) {
@@ -177,44 +178,48 @@ public class Item {
         }
     }
 
-    private List<XmlModels.Upload> GetUploadsInProgressAsync(String bucket) throws IOException, InterruptedException {
+    private List<XmlModels.Upload> getUploadsInProgress(String bucket) throws IOException, InterruptedException {
         PutRequest request1 = new PutRequest();
-        request1.Bucket = bucket;
-        return GetUploadsInProgressAsync(request1);
+        request1.bucket = bucket;
+        return getUploadsInProgress(request1);
     }
 
-    private List<XmlModels.Upload> GetUploadsInProgressAsync(PutRequest request) throws IOException, InterruptedException {
+    private List<XmlModels.Upload> getUploadsInProgress(PutRequest request) throws IOException, InterruptedException {
         var listMultipartUploadsRequest = HttpRequest.newBuilder()
                 .GET()
-                .uri(URI.create(String.format("%s/%s/?uploads", Url, request.Bucket)));
+                .uri(URI.create(String.format("%s/%s/?uploads", url, request.bucket)));
 
-        var listMultipartUploadsResult = _client.SendAsync(listMultipartUploadsRequest, XmlModels.ListMultipartUploadsResult.class);
-        if (request.HasFilename()) {
-            return listMultipartUploadsResult.Uploads != null ? listMultipartUploadsResult.Uploads : Collections.emptyList();
+        var listMultipartUploadsResult = client.send(listMultipartUploadsRequest, XmlModels.ListMultipartUploadsResult.class);
+        if (listMultipartUploadsResult.uploads != null) {
+            if (request.hasFilename()) {
+                return listMultipartUploadsResult.uploads;
+            } else {
+                return listMultipartUploadsResult.uploads.stream().filter(x -> x.key.equals(request.filename())).collect(Collectors.toList());
+            }
         } else {
-            return listMultipartUploadsResult.Uploads.stream().filter(x -> x.Key.equals(request.Filename())).collect(Collectors.toList());
+            return Collections.emptyList();
         }
     }
 
-    public void AbortUploadAsync(String bucket) throws ExecutionException, InterruptedException, IOException {
-        var uploads = GetUploadsInProgressAsync(bucket);
+    public void abortUpload(String bucket) throws InterruptedException, IOException {
+        var uploads = getUploadsInProgress(bucket);
         for (var upload : uploads) {
             var abortMultipartUploadRequest = HttpRequest.newBuilder()
                     .DELETE()
-                    .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", Url, bucket, upload.Key, upload.UploadId)));
+                    .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", url, bucket, upload.key, upload.uploadId)));
 
-            _client.SendAsync(abortMultipartUploadRequest, HttpResponse.class);
+            client.send(abortMultipartUploadRequest, HttpResponse.class);
         }
     }
 
-    public void AbortUploadAsync(PutRequest request) throws ExecutionException, InterruptedException, IOException {
-        var uploads = GetUploadsInProgressAsync(request);
+    public void abortUpload(PutRequest request) throws InterruptedException, IOException {
+        var uploads = getUploadsInProgress(request);
         for (var upload : uploads) {
             var abortMultipartUploadRequest = HttpRequest.newBuilder()
                     .DELETE()
-                    .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", Url, request.Bucket, request.Filename(), upload.UploadId)));
+                    .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", url, request.bucket, request.filename(), upload.uploadId)));
 
-            _client.SendAsync(abortMultipartUploadRequest, HttpResponse.class);
+            client.send(abortMultipartUploadRequest, HttpResponse.class);
         }
     }
 
@@ -223,65 +228,84 @@ public class Item {
         @JacksonXmlRootElement(namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
         static class ListMultipartUploadsResult {
 
-            public String Bucket = null;
-            public String KeyMarker = null;
-            public String UploadIdMarker = null;
-            public String NextKeyMarker = null;
-            public String NextUploadIdMarker = null;
-            public int MaxUploads;
+            @JacksonXmlProperty(localName = "Bucket")
+            public String bucket = null;
+            @JacksonXmlProperty(localName = "KeyMarker")
+            public String keyMarker = null;
+            @JacksonXmlProperty(localName = "UploadIdMarker")
+            public String uploadIdMarker = null;
+            @JacksonXmlProperty(localName = "NextKeyMarker")
+            public String nextKeyMarker = null;
+            @JacksonXmlProperty(localName = "NextUploadIdMarker")
+            public String nextUploadIdMarker = null;
+            @JacksonXmlProperty(localName = "MaxUploads")
+            public int maxUploads;
 
-            public boolean IsTruncated;
+            @JacksonXmlProperty(localName = "IsTruncated")
+            public boolean isTruncated;
 
             @JacksonXmlProperty(localName = "Upload")
-            public List<Upload> Uploads = null;
+            public List<Upload> uploads = null;
         }
 
         static class Upload {
 
-            public String Key = null;
-            public String UploadId = null;
+            @JacksonXmlProperty(localName = "Key")
+            public String key = null;
+            @JacksonXmlProperty(localName = "UploadId")
+            public String uploadId = null;
         }
 
         @JacksonXmlRootElement(namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
         static class InitiateMultipartUploadResult {
 
-            public String Bucket = null;
-            public String Key = null;
-            public String UploadId = null;
+            @JacksonXmlProperty(localName = "Bucket")
+            public String bucket = null;
+            @JacksonXmlProperty(localName = "Key")
+            public String key = null;
+            @JacksonXmlProperty(localName = "UploadId")
+            public String uploadId = null;
         }
 
         @JacksonXmlRootElement(namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
         static class ListPartsResult {
 
-            public String Bucket = null;
-            public String Key = null;
-            public String UploadId = null;
-            public String PartNumberMarker = null;
-            public String NextPartNumberMarker = null;
-            public int MaxParts;
-            public boolean IsTruncated;
+            @JacksonXmlProperty(localName = "Bucket")
+            public String bucket = null;
+            @JacksonXmlProperty(localName = "Key")
+            public String key = null;
+            @JacksonXmlProperty(localName = "UploadId")
+            public String uploadId = null;
+            @JacksonXmlProperty(localName = "PartNumberMarker")
+            public String partNumberMarker = null;
+            @JacksonXmlProperty(localName = "NextPartNumberMarker")
+            public String nextPartNumberMarker = null;
+            @JacksonXmlProperty(localName = "MaxParts")
+            public int maxParts;
+            @JacksonXmlProperty(localName = "IsTruncated")
+            public boolean isTruncated;
 
             @JacksonXmlProperty(localName = "Part")
-            public List<Part> Parts = null;
+            public List<Part> parts = null;
         }
 
         @JacksonXmlRootElement
         static class Part {
 
             //@DataMember
-            public int PartNumber;
+            public int partNumber;
             //@DataMember
-            public String ETag = null;
+            public String eTag = null;
         }
 
         @JacksonXmlRootElement(namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
         static class CompleteMultipartUpload {
             @JacksonXmlProperty(localName = "Part")
-            public List<Part> Parts = null;
+            public List<Part> parts = null;
         }
     }
 
-    private HttpResponse<?> MultipartUpload(PutRequest request, SeekableByteChannel
+    private HttpResponse<?> multipartUpload(PutRequest request, SeekableByteChannel
             sourceStream, HttpRequest.Builder uploadRequest) throws IOException, InterruptedException {
         CopyOnWriteArrayList<XmlModels.Part> parts = new CopyOnWriteArrayList<>();
         String uploadId = null;
@@ -289,16 +313,16 @@ public class Item {
         try {
             // see if there's already a multipart upload in progress
 
-            var uploads = GetUploadsInProgressAsync(request);
+            var uploads = getUploadsInProgress(request);
             if (uploads.size() > 0) {
-                uploadId = uploads.stream().findFirst().get().UploadId;
+                uploadId = uploads.stream().findFirst().get().uploadId;
 
                 var listPartsRequest = HttpRequest.newBuilder()
                         .GET()
-                        .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", Url, request.Bucket, request.Filename(), uploadId)));
+                        .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", url, request.bucket, request.filename(), uploadId)));
 
-                var listPartsResult = _client.SendAsync(listPartsRequest, XmlModels.ListPartsResult.class);
-                parts.addAll(listPartsResult.Parts);
+                var listPartsResult = client.send(listPartsRequest, XmlModels.ListPartsResult.class);
+                parts.addAll(listPartsResult.parts);
             }
         } catch (Client.HttpException ex) {
             if (ex.statusCode != 404) throw ex;
@@ -307,48 +331,50 @@ public class Item {
         if (uploadId == null) {
             uploadRequest.POST(HttpRequest.BodyPublishers.noBody()); // TODO
 
-            var initiateMultipartUploadResult = _client.SendAsync(uploadRequest, XmlModels.InitiateMultipartUploadResult.class);
+            var initiateMultipartUploadResult = client.send(uploadRequest, XmlModels.InitiateMultipartUploadResult.class);
             if (initiateMultipartUploadResult == null) return null; // dry run
 
-            uploadId = initiateMultipartUploadResult.UploadId;
+            uploadId = initiateMultipartUploadResult.uploadId;
         }
 
-        var totalParts = sourceStream.size() / request.MultipartUploadChunkSize;
-        if (sourceStream.size() % request.MultipartUploadChunkSize != 0) totalParts++;
+        var totalParts = sourceStream.size() / request.multipartUploadChunkSize;
+        if (sourceStream.size() % request.multipartUploadChunkSize != 0) totalParts++;
 
         var tasks = new ArrayList<Future<?>>();
 
         ExecutorService es = Executors.newFixedThreadPool((int) totalParts);
         for (var i = new AtomicInteger(1); i.get() <= totalParts; i.addAndGet(2)) {
-            if (request.MultipartUploadSkipParts.contains(i.get()) || parts.stream().anyMatch(x -> x.PartNumber == i.get()))
+            if (request.multipartUploadSkipParts.contains(i.get()) || parts.stream().anyMatch(x -> x.partNumber == i.get()))
                 continue;
 
             String uploadId_ = uploadId;
             tasks.add(es.submit(() -> {
                 try {
-                    var buffer = ByteBuffer.allocate(request.MultipartUploadChunkSize);
+                    var buffer = ByteBuffer.allocate(request.multipartUploadChunkSize);
                     int length;
 
                     synchronized (sourceStream) {
-                        sourceStream.position((i.get() - 1L) * request.MultipartUploadChunkSize);
+Debug.printf("[%d] sourceStream: %d/%d", i.get(), sourceStream.position(), sourceStream.size());
+                        sourceStream.position((i.get() - 1L) * request.multipartUploadChunkSize);
                         length = sourceStream.read(buffer);
+Debug.printf("[%d] length: %d/%d", i.get(), length, buffer.capacity());
                     }
 
                     var partRequest = HttpRequest.newBuilder()
                             .PUT(HttpRequest.BodyPublishers.ofByteArray(buffer.array()))
-                            .uri(URI.create(String.format("%s/%s/%s?partNumber=%s&uploadId=%s", Url, request.Bucket, request.Filename(), i.get(), uploadId_)));
+                            .uri(URI.create(String.format("%s/%s/%s?partNumber=%s&uploadId=%s", url, request.bucket, request.filename(), i.get(), uploadId_)));
 
                     var md5 = MessageDigest.getInstance("MD5");
                     md5.update(buffer.array(), 0, length);
                     partRequest.header("ContentMD5", ByteUtil.toHexString(md5.digest()));
 
-                    var partResponse = _client.SendAsync(partRequest, HttpResponse.class);
+                    var partResponse = client.send(partRequest, HttpResponse.class);
                     if (partResponse.headers().firstValue("ETag").isEmpty())
-                        throw new Exception("Invalid multipart upload response for part {partNumber}");
+                        throw new Exception("Invalid multipart upload response for part " + i.get());
 
                     var part = new XmlModels.Part();
-                    part.PartNumber = i.get();
-                    part.ETag = partResponse.headers().firstValue("ETag").get();
+                    part.partNumber = i.get();
+                    part.eTag = partResponse.headers().firstValue("ETag").get();
                     parts.add(part);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -363,96 +389,126 @@ public class Item {
 
         if (parts.size() != totalParts) return null;
 
-        XmlMapper serializer = XmlMapper.xmlBuilder().build();
         var ms = new ByteArrayOutputStream();
         XmlModels.CompleteMultipartUpload cmu = new XmlModels.CompleteMultipartUpload();
-        parts.sort(Comparator.comparingInt(x -> x.PartNumber));
-        cmu.Parts = parts;
-        serializer.writeValue(ms, cmu);
+        parts.sort(Comparator.comparingInt(x -> x.partNumber));
+        cmu.parts = parts;
+        Client.jaxson.writeValue(ms, cmu);
         String xml = ms.toString();
         var httpRequest = HttpRequest.newBuilder()
                 .POST(HttpRequest.BodyPublishers.ofString(xml, StandardCharsets.UTF_8))
                 .header("Content-Type", "application/xml")
-                .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", Url, request.Bucket, request.Filename(), uploadId)));
-        return _client.SendAsync(httpRequest, HttpResponse.class);
+                .uri(URI.create(String.format("%s/%s/%s?uploadId=%s", url, request.bucket, request.filename(), uploadId)));
+        return client.send(httpRequest, HttpResponse.class);
     }
 
     static class DeleteRequest {
 
-        public String Bucket;
+        public String bucket;
 
-        public String RemoteFilename;
+        public String remoteFilename;
 
-        public boolean KeepOldVersion;
+        public boolean keepOldVersion;
 
-        public boolean CascadeDelete;
+        public boolean cascadeDelete;
     }
 
-    public HttpResponse<Void> DeleteAsync(DeleteRequest request) throws IOException, InterruptedException {
-        if (request.Bucket == null) throw new IllegalArgumentException("identifier required");
-        if (request.Bucket.contains("/"))
-            throw new IllegalArgumentException("slash not allowed in bucket name; use .RemoteFilename to specify the file to delete in a bucket");
+    public HttpResponse<?> delete(DeleteRequest request) throws IOException, InterruptedException {
+        if (request.bucket == null) throw new IllegalArgumentException("identifier required");
+        if (request.bucket.contains("/"))
+            throw new IllegalArgumentException("slash not allowed in bucket name; use .remoteFilename to specify the file to delete in a bucket");
 
-        String requestUri = "{Url}/{request.Bucket}";
-        if (request.RemoteFilename != null) requestUri += "/{Encode(request.RemoteFilename)}";
+        String requestUri = url + "/" + request.bucket;
+        if (request.remoteFilename != null) requestUri += "/" + URLEncoder.encode(request.remoteFilename, StandardCharsets.UTF_8);
 
         var httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(requestUri))
                 .DELETE();
-        if (request.KeepOldVersion) httpRequest.header("x-archive-keep-old-version", "1");
-        if (request.CascadeDelete) httpRequest.header("x-archive-cascade-delete", "1");
+        if (request.keepOldVersion) httpRequest.header("x-archive-keep-old-version", "1");
+        if (request.cascadeDelete) httpRequest.header("x-archive-cascade-delete", "1");
 
-        return _client.SendAsync(httpRequest, HttpResponse.class);
+        return client.send(httpRequest, HttpResponse.class);
+    }
+
+    static class HeadRequest {
+
+        public String bucket;
+
+        public String remoteFilename;
+
+        public HeadRequest(String bucket, String remoteFilename) {
+            if (bucket == null) throw new IllegalArgumentException("identifier required");
+            if (bucket.contains("/"))
+                throw new IllegalArgumentException("slash not allowed in bucket name; use .remoteFilename to specify the file to delete in a bucket");
+
+            this.bucket = bucket;
+            this.remoteFilename = remoteFilename;
+        }
+
+        URI toUri() {
+            String requestUri = url + "/" + this.bucket;
+            if (this.remoteFilename != null)
+                requestUri += "/" + URLEncoder.encode(this.remoteFilename, StandardCharsets.UTF_8);
+            return URI.create(requestUri);
+        }
+    }
+
+    public HttpResponse<Void> head(HeadRequest request) throws IOException, InterruptedException {
+        var httpRequest = HttpRequest.newBuilder()
+                .uri(request.toUri())
+                .method("HEAD", HttpRequest.BodyPublishers.noBody()); // WTF #HEAD() is from java20
+
+        return client.send(httpRequest, HttpResponse.class);
     }
 
     static class UseLimitResponse {
 
-        public String Bucket;
+        public String bucket;
 
-        public String AccessKey;
+        public String accessKey;
 
-        @JacksonXmlProperty(localName = "over_limit")
-        public int OverLimit;
+        @SerializedName("over_limit")
+        public int overLimit;
 
         static class Detail_ {
 
-            @JacksonXmlProperty(localName = "accesskey_ration")
-            public long AccessKeyRation;
+            @SerializedName("accesskey_ration")
+            public Long accessKeyRation;
 
-            @JacksonXmlProperty(localName = "accesskey_tasks_queued")
-            public long AccessKeyTasksQueued;
+            @SerializedName("accesskey_tasks_queued")
+            public Long accessKeyTasksQueued;
 
-            @JacksonXmlProperty(localName = "bucket_ration")
-            public long BucketRation;
+            @SerializedName("bucket_ration")
+            public Long bucketRation;
 
-            @JacksonXmlProperty(localName = "bucket_tasks_queued")
-            public long BucketTasksQueued;
+            @SerializedName("bucket_tasks_queued")
+            public Long bucketTasksQueued;
 
-            @JacksonXmlProperty(localName = "limit_reason")
-            public String LimitReason;
+            @SerializedName("limit_reason")
+            public String limitReason;
 
-            @JacksonXmlProperty(localName = "rationing_engaged")
-            public long RationingEngaged;
+            @SerializedName("rationing_engaged")
+            public Long rationingEngaged;
 
-            @JacksonXmlProperty(localName = "rationing_level")
-            public long RationingLevel;
+            @SerializedName("rationing_level")
+            public Long rationingLevel;
 
-            @JacksonXmlProperty(localName = "total_global_limit")
-            public long TotalGlobalLimit;
+            @SerializedName("total_global_limit")
+            public Long totalGlobalLimit;
 
-            @JacksonXmlProperty(localName = "total_tasks_queued")
-            public long TotalTasksQueued;
+            @SerializedName("total_tasks_queued")
+            public Long totalTasksQueued;
         }
 
-        public Detail_ Detail;
+        public Detail_ detail;
     }
 
-    public UseLimitResponse GetUseLimitAsync(String bucket/* = ""*/) throws IOException, InterruptedException {
+    public UseLimitResponse getUseLimit(String bucket/* = ""*/) throws IOException, InterruptedException {
         Map<String, String> query = new HashMap<>();
         query.put("check_limit", "1");
-        query.put("accesskey", _client.AccessKey);
+        query.put("accesskey", client.accessKey);
         query.put("bucket", bucket);
 
-        return _client.GetAsync(Url, query, UseLimitResponse.class);
+        return client.get(url, query, UseLimitResponse.class);
     }
 }

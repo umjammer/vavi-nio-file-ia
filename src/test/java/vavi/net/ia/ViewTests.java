@@ -4,133 +4,140 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 public class ViewTests extends Base {
 
-    private static final String _item = "adventuresoftoms00twaiiala";
-    private static final String[] _items = {_item, "texts"};
-    private static final String _collection = "computer-image-corporation-archive";
+    private static final String item = "adventuresoftoms00twaiiala";
+    private static final String[] items = {item, "texts"};
+    private static final String collection = "computer-image-corporation-archive";
 
-    private static void ValidateSummary(Views.Summary view) {
-        Assertions.assertNotNull(view);
-        Assertions.assertTrue(view.HasData);
+    private static void validateSummary(Views.Summary view) {
+        assertNotNull(view);
+        assertTrue(view.hasData);
 
-        Assertions.assertNotNull(view.Last7Days);
-        Assertions.assertNotNull(view.Last30Days);
-        Assertions.assertNotNull(view.AllTime);
+        assertNotNull(view.last7Days);
+        assertNotNull(view.last30Days);
+        assertNotNull(view.allTime);
     }
 
     @Test
-    public void GetItemSummary() throws IOException, InterruptedException {
-        var view = _client.Views.GetItemSummaryAsync(_item, false);
-        ValidateSummary(view);
-        Assertions.assertNull(view.Detail);
+    public void getItemSummary() throws IOException, InterruptedException {
+        var view = client.views.getItemSummary(item, false);
+        validateSummary(view);
+        assertNull(view.detail);
 
-        view = _client.Views.GetItemSummaryAsync(_item, /*legacy:*/ true);
-        ValidateSummary(view);
-        Assertions.assertNull(view.Detail);
+        view = client.views.getItemSummary(item, /*legacy:*/ true);
+        validateSummary(view);
+        assertNull(view.detail);
 
-        var views = _client.Views.GetItemSummaryAsync(_items, false);
-        Assertions.assertEquals(2, views.size());
-        ValidateSummary(views.values().stream().findFirst().get());
+        var views = client.views.getItemSummary(items, false);
+        assertEquals(2, views.size());
+        var summary = views.values().stream().findFirst();
+        assertTrue(summary.isPresent());
+        validateSummary(summary.get());
     }
 
-    private static <T> void ValidatePerDay(Views.SummaryPerDay<T> details) {
-        Assertions.assertNotNull(details);
-        Assertions.assertNotNull(details.Days);
+    private static <T> void validatePerDay(Views.SummaryPerDay<T> details) {
+        assertNotNull(details);
+        assertNotNull(details.days);
 
-        var summary = details.Ids.values().stream().findFirst().get();
-        ValidateSummary(summary);
-        ValidateDetail(summary.Detail);
+        var summary = details.ids.values().stream().findFirst();
+        assertTrue(summary.isPresent());
+        validateSummary(summary.get());
+        validateDetail(summary.get().detail);
     }
 
-    static void ValidateDetail(Views.SummaryDetail detail) {
-        Assertions.assertNotNull(detail);
-        Assertions.assertNotNull(detail.Pre2017Total);
+    static void validateDetail(Views.SummaryDetail detail) {
+        assertNotNull(detail);
+        assertNotNull(detail.pre2017Total);
 
-        ValidateStats(detail.Robot);
-        ValidateStats(detail.NonRobot);
-        ValidateStats(detail.Unrecognized);
-        ValidateStats(detail.Pre2017);
+        validateStats(detail.robot);
+        validateStats(detail.nonRobot);
+        validateStats(detail.unrecognized);
+        validateStats(detail.pre2017);
     }
 
-    static void ValidateStats(Views.SummaryDetailStats stats) {
-        Assertions.assertNotNull(stats);
-        Assertions.assertNotNull(stats.PerDay);
-        Assertions.assertNotNull(stats.SumPerDay);
-        Assertions.assertNotNull(stats.PreviousDaysTotal);
+    static void validateStats(Views.SummaryDetailStats stats) {
+        assertNotNull(stats);
+        assertNotNull(stats.perDay);
+        assertNotNull(stats.sumPerDay);
+        assertNotNull(stats.previousDaysTotal);
     }
 
     @Test
-    public void GetItemSummaryPerDayAsync() throws IOException, InterruptedException {
-        var perDayDateTime = _client.Views.<LocalDateTime>GetItemSummaryPerDayAsync(_item);
-        ValidatePerDay(perDayDateTime);
-        Assertions.assertEquals(1, perDayDateTime.Ids.size());
+    public void getItemSummaryPerDay() throws IOException, InterruptedException {
+        var perDayDateTime = client.views.<LocalDateTime>getItemSummaryPerDay(item);
+        validatePerDay(perDayDateTime);
+        assertEquals(1, perDayDateTime.ids.size());
 
-        var perDayString = _client.Views.<String>GetItemSummaryPerDayAsync(_item);
-        ValidatePerDay(perDayString);
-        Assertions.assertEquals(1, perDayString.Ids.size());
+        var perDayString = client.views.<String>getItemSummaryPerDay(item);
+        validatePerDay(perDayString);
+        assertEquals(1, perDayString.ids.size());
 
-        var perDayLocalDate = _client.Views.<LocalDate>GetItemSummaryPerDayAsync(_items);
-        ValidatePerDay(perDayLocalDate);
-        Assertions.assertEquals(2, perDayLocalDate.Ids.size());
+        var perDayLocalDate = client.views.<LocalDate>getItemSummaryPerDay(items);
+        validatePerDay(perDayLocalDate);
+        assertEquals(2, perDayLocalDate.ids.size());
     }
 
-    private static <T> void ValidateDetails(Views.Details<T> details) {
-        Assertions.assertNotNull(details);
-        Assertions.assertNotNull(details.Days);
-        Assertions.assertNotNull(details.Counts);
+    private static <T> void validateDetails(Views.Details<T> details) {
+        assertNotNull(details);
+        assertNotNull(details.days);
+        assertNotNull(details.counts);
 
-        var count = details.Counts.stream().findFirst().orElseGet(Views.Details.GeoCount::new);
-        Assertions.assertNotNull(count);
-        Assertions.assertNotNull(count.Count);
-        Assertions.assertNotNull(count.CountKind);
-        Assertions.assertNotNull(count.Country);
-        Assertions.assertNotNull(count.GeoCountry);
-        Assertions.assertNotNull(count.GeoState);
-        Assertions.assertNotNull(count.Kind);
-        Assertions.assertNotNull(count.Latitude);
-        Assertions.assertNotNull(count.Longitude);
-        Assertions.assertNotNull(count.State);
+        var count = details.counts.stream().findFirst().orElseGet(Views.Details.GeoCount::new);
+        assertNotNull(count);
+        assertNotNull(count.count);
+        assertNotNull(count.countKind);
+        assertNotNull(count.country);
+        assertNotNull(count.geoCountry);
+        assertNotNull(count.geoState);
+        assertNotNull(count.kind);
+        assertNotNull(count.latitude);
+        assertNotNull(count.longitude);
+        assertNotNull(count.state);
 
-        Assertions.assertNotNull(details.Referers);
-        if (details.Referers.size() > 0) {
-            var referer = details.Referers.stream().findFirst().get();
-            Assertions.assertNotNull(referer.Kind);
-            Assertions.assertNotNull(referer.Referer);
-            Assertions.assertNotNull(referer.Score);
+        assertNotNull(details.referers);
+        if (details.referers.size() > 0) {
+            var referer = details.referers.stream().findFirst().get();
+            assertNotNull(referer.kind);
+            assertNotNull(referer.referer);
+            assertNotNull(referer.score);
         }
     }
 
     @Test
-    public void GetItemDetailsAsync() throws IOException, InterruptedException {
-        var details = _client.Views.GetItemDetailsAsync(_item, _startDateTime, _endDateTime);
-        ValidateDetails(details);
+    public void getItemDetails() throws IOException, InterruptedException {
+        var details = client.views.getItemDetails(item, startDateTime, endDateTime);
+        validateDetails(details);
 
-        var details2 = _client.Views.GetItemDetailsAsync(_item, _startLocalDate, _endLocalDate);
-        ValidateDetails(details2);
+        var details2 = client.views.getItemDetails(item, startDate, endDate);
+        validateDetails(details2);
     }
 
     @Test
-    public void GetCollectionDetailsAsync() throws IOException, InterruptedException {
-        var details = _client.Views.GetCollectionDetailsAsync(_collection, _startDateTime, _endDateTime);
-        ValidateDetails(details);
+    public void getCollectionDetails() throws IOException, InterruptedException {
+        var details = client.views.getCollectionDetails(collection, startDateTime, endDateTime);
+        validateDetails(details);
 
-        var details2 = _client.Views.GetCollectionDetailsAsync(_collection, _startLocalDate, _endLocalDate);
-        ValidateDetails(details2);
+        var details2 = client.views.getCollectionDetails(collection, startDate, endDate);
+        validateDetails(details2);
     }
 
 //#if LATER // documented but not currently implemented at archive.org
 //    @Test
-//    public void GetContributorDetailsAsync() {
-//        var details = _client.Views.GetContributorDetailsAsync(_contributor, _startDateTime, _endDateTime);
-//        ValidateDetails(details);
+//    public void getContributorDetails() {
+//        var details = client.views.getContributorDetails(_contributor, startDateTime, endDateTime);
+//        validateDetails(details);
 //
-//        var details2 = _client.Views.GetContributorDetailsAsync(_contributor, _startLocalDate, _endLocalDate);
-//        ValidateDetails(details2);
+//        var details2 = client.views.getContributorDetails(_contributor, startDate, endDate);
+//        validateDetails(details2);
 //    }
 //#endif
 }

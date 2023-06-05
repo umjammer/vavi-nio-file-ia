@@ -1,6 +1,10 @@
 package vavi.net.ia;
 
-class ServerResponseException extends RuntimeException {
+import java.io.IOException;
+
+
+class ServerResponseException extends IOException {
+
     public ServerResponseException(String message) {
         super(message);
     }
@@ -11,9 +15,9 @@ class ServerResponseException extends RuntimeException {
 }
 
 public class ServerResponse {
-    public boolean Success;
+    public boolean success;
 
-    public void EnsureSuccess() throws ServerResponseException {
-        if (!Success) throw new ServerResponseException("server returned success == false");
+    public void ensureSuccess() throws IOException {
+        if (!success) throw new ServerResponseException("server returned success == false");
     }
 }

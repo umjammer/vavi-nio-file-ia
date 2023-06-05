@@ -2,12 +2,11 @@ package vavi.net.ia;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import javax.json.Json;
-import javax.json.JsonPatchBuilder;
-import javax.json.JsonWriter;
 
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import jakarta.json.Json;
+import jakarta.json.JsonPatchBuilder;
+import jakarta.json.JsonWriter;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -19,61 +18,59 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MetadataTests extends Base {
 
-    protected static String _testItem = null;
+    protected static String testItem = null;
 
     @BeforeAll
-    static void ClassInit() throws IOException, InterruptedException {
-        _testItem = CreateTestItemAsync(null, null);
+    static void classInit() throws IOException, InterruptedException {
+        testItem = createTestItem(null, null);
     }
 
     @Test
-    public void ReadMetadataAsync() throws Exception {
-        Metadata.ReadResponse response = _client.Metadata.ReadAsync(_testItem);
+    public void readMetadata() throws Exception {
+        Metadata.ReadResponse response = client.metadata.read(testItem);
 
         assertNotNull(response);
-        assertNotNull(response.DataNodePrimary);
-        assertNotNull(response.DataNodeSecondary);
-        assertNull(response.DataNodeSolo);
-        assertNotNull(response.DateCreated);
-        assertNotNull(response.DateLastUpdated);
-        assertNotNull(response.Dir);
-        assertNotNull(response.Files);
-        assertNotNull(response.Metadata);
-        assertNotNull(response.Size);
-        assertNotNull(response.Uniq);
+        assertNotNull(response.dataNodePrimary);
+        assertNotNull(response.dataNodeSecondary);
+        assertNull(response.dataNodeSolo);
+        assertNotNull(response.dateCreated);
+        assertNotNull(response.dateLastUpdated);
+        assertNotNull(response.dir);
+        assertNotNull(response.files);
+        assertNotNull(response.metadata);
+        assertNotNull(response.size);
+        assertNotNull(response.uniq);
 
-        assertNotNull(response.WorkableServers);
-        assertTrue(response.WorkableServers.length > 0);
-        // Assertions.assertNull(response.ServersUnavailable); may be null or not
+        assertNotNull(response.workableServers);
+        assertTrue(response.workableServers.size() > 0);
+        // Assertions.assertNull(response.serversUnavailable); may be null or not
 
-        var collection = response.Metadata.entrySet().stream().filter(x -> x.getKey().equals("collection")).findFirst().get();
+        var collection = response.metadata.entrySet().stream().filter(x -> x.getKey().equals("collection")).findFirst().get();
         assertNotNull(collection);
 
-        var file = response.Files.stream().filter(x -> x.Format.equals("Text") && x.Name.equals(_config.RemoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new);
+        var file = response.files.stream().filter(x -> x.format.equals("Text") && x.name.equals(config.remoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new);
 
         assertNotNull(file);
-        assertNotNull(file.Crc32);
-        assertNotNull(file.Format);
-        assertNotNull(file.Md5);
-        assertNotNull(file.ModificationDate);
-        assertNotNull(file.Name);
-        assertNotNull(file.Sha1);
-        assertNotNull(file.Size);
-        assertNotNull(file.Source);
-        assertNotNull(file.VirusCheckDate);
+        assertNotNull(file.crc32);
+        assertNotNull(file.format);
+        assertNotNull(file.md5);
+        assertNotNull(file.modificationDate);
+        assertNotNull(file.name);
+        assertNotNull(file.sha1);
+        assertNotNull(file.size);
+        assertNotNull(file.source);
+        assertNotNull(file.virusCheckDate);
     }
 
     @Test
-    public void WriteMetadataAsync() throws IOException, InterruptedException {
-        var readResponse1 = _client.Metadata.ReadAsync(_testItem);
+    public void writeMetadata() throws IOException, InterruptedException {
+        var readResponse1 = client.metadata.read(testItem);
 
         JsonPatchBuilder patch = Json.createPatchBuilder();
 
-        JsonObject json = Client._json.fromJson(Client._json.toJson(readResponse1.Metadata), JsonObject.class);
-
         JsonElement element;
         String value;
-        if ((element = json.get("testkey")) != null) {
+        if ((element = readResponse1.metadata.get("testkey")) != null) {
             value = element.getAsString().equals("flop") ? "flip" : "flop";
             patch.replace("/testkey", value);
         } else {
@@ -83,18 +80,18 @@ public class MetadataTests extends Base {
 
         StringWriter stringWriter = new StringWriter();
         JsonWriter jsonWriter = Json.createWriter(stringWriter);
-        jsonWriter.write(patch.build().toJsonArray());
 
-        var writeResponse = _client.Metadata.WriteAsync(_testItem, stringWriter.toString());
+        jsonWriter.write(patch.build().toJsonArray()); // need not be an array
+
+        var writeResponse = client.metadata.write(testItem, stringWriter.toString());
 
         assertNotNull(writeResponse);
-        assertTrue(writeResponse.Success);
-        assertNull(writeResponse.Error);
-        assertNotNull(writeResponse.Log);
-        assertNotNull(writeResponse.TaskId);
+        assertTrue(writeResponse.success);
+        assertNull(writeResponse.error);
+        assertNotNull(writeResponse.log);
+        assertNotNull(writeResponse.taskId);
 
-        var readResponse2 = _client.Metadata.ReadAsync(_testItem);
-        assertEquals(value, readResponse2.Metadata.get("testkey").getAsString());
-        readResponse2.close();
+        var readResponse2 = client.metadata.read(testItem);
+        assertEquals(value, readResponse2.metadata.get("testkey").getAsString());
     }
 }

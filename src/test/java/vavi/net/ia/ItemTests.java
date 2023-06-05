@@ -2,6 +2,7 @@ package vavi.net.ia;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +10,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.google.gson.JsonElement;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import vavi.net.ia.dotnet.KeyValuePair;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -25,11 +28,11 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 public class ItemTests extends Base {
 
-    private static Path _largeFilePath = null;
-    private static final String _largeFileRemoteName = "large.txt";
+    private static Path largeFilePath = null;
+    private static final String largeFileRemoteName = "large.txt";
 
     @BeforeAll
-    public static void ClassInit() throws IOException {
+    public static void classInit() throws IOException {
         byte[] chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz          ".getBytes(StandardCharsets.US_ASCII);
         byte[] s = new byte[1024 * 1024 * 11]; // 11MB
 
@@ -38,53 +41,53 @@ public class ItemTests extends Base {
             s[i] = chars[random.nextInt(chars.length)];
         }
 
-        _largeFilePath = Files.createTempDirectory(ItemTests.class.getPackageName()).resolve(_largeFileRemoteName);
-        try (OutputStream stream = Files.newOutputStream(_largeFilePath)) {
+        largeFilePath = Files.createTempDirectory(ItemTests.class.getPackageName()).resolve(largeFileRemoteName);
+        try (OutputStream stream = Files.newOutputStream(largeFilePath)) {
             stream.write(s, 0, s.length);
         }
     }
 
     @Test
-    public void GetUseLimitAsync() throws IOException, InterruptedException {
-        String identifer = GetSharedTestIdentifierAsync();
+    public void getUseLimit() throws IOException, InterruptedException {
+        String identifier = getSharedTestIdentifier();
 
-        var response = _client.Item.GetUseLimitAsync(_config.TestItem);
+        var response = client.item.getUseLimit(config.testItem);
 
         assertNotNull(response);
 
-        Assertions.assertEquals(identifer, response.Bucket);
-        Assertions.assertEquals(0, response.OverLimit);
+        Assertions.assertEquals(identifier, response.bucket);
+        Assertions.assertEquals(0, response.overLimit);
 
-        assertNotNull(response.Detail);
-        Assertions.assertEquals("", response.Detail.LimitReason);
+        assertNotNull(response.detail);
+        Assertions.assertEquals("", response.detail.limitReason);
 
-        assertNotNull(response.Detail.AccessKeyRation);
-        assertNotNull(response.Detail.AccessKeyTasksQueued);
-        assertNotNull(response.Detail.BucketRation);
-        assertNotNull(response.Detail.BucketTasksQueued);
-        assertNotNull(response.Detail.RationingEngaged);
-        assertNotNull(response.Detail.RationingLevel);
-        assertNotNull(response.Detail.TotalGlobalLimit);
-        assertNotNull(response.Detail.TotalTasksQueued);
+        assertNotNull(response.detail.accessKeyRation);
+        assertNotNull(response.detail.accessKeyTasksQueued);
+        assertNotNull(response.detail.bucketRation);
+        assertNotNull(response.detail.bucketTasksQueued);
+        assertNotNull(response.detail.rationingEngaged);
+        assertNotNull(response.detail.rationingLevel);
+        assertNotNull(response.detail.totalGlobalLimit);
+        assertNotNull(response.detail.totalTasksQueued);
     }
 
-    private static void AssertionsHasMetadata(Metadata.ReadResponse response, String key, String expectedValue) {
+    private static void assertHasMetadata(Metadata.ReadResponse response, String key, String expectedValue) {
         assertNotNull(response);
-        assertNotNull(response.Metadata);
-        JsonElement element = response.Metadata.get(key);
+        assertNotNull(response.metadata);
+        JsonElement element = response.metadata.get(key);
         assertNotNull(element);
         Assertions.assertEquals(expectedValue, element.getAsString());
     }
 
-    private static void AssertionsNoMetadata(Metadata.ReadResponse response, String key) {
+    private static void assertNoMetadata(Metadata.ReadResponse response, String key) {
         assertNotNull(response);
-        assertNotNull(response.Metadata);
-        JsonElement element = response.Metadata.get(key);
+        assertNotNull(response.metadata);
+        JsonElement element = response.metadata.get(key);
         Assertions.assertNull(element);
     }
 
     @Test
-    public void CreateModifyDeleteAsync() throws Exception {
+    public void createModifyDelete() throws Exception {
         final String _remoteFilename2 = "hello; again #2.txt";
 
         var extraMetadata = new ArrayList<KeyValuePair<String, Object>>() {
@@ -94,141 +97,136 @@ public class ItemTests extends Base {
             }
         };
 
-        var identifier = CreateTestItemAsync("extraMetadata", extraMetadata);
+        var identifier = createTestItem("extraMetadata", extraMetadata);
 
-        WaitForServerAsync(identifier);
+        waitForServer(identifier);
 
         // verify metadata
 
-        var response1 = _client.Metadata.ReadAsync(identifier);
-        AssertionsHasMetadata(response1, "title", "test_title");
-        AssertionsHasMetadata(response1, "testfield", "hello");
+        var response1 = client.metadata.read(identifier);
+        assertHasMetadata(response1, "title", "test_title");
+        assertHasMetadata(response1, "testfield", "hello");
 
-        assertNotNull(response1.Metadata);
-        var metadataFiltered = response1.Metadata.entrySet().stream()
+        assertNotNull(response1.metadata);
+        var metadataFiltered = response1.metadata.entrySet().stream()
                 .filter(x -> !x.getKey().equals("title") && !x.getKey().equals("testfield") && !x.getKey().equals("collection"))
                 .map(x -> new KeyValuePair<String, Object>(x.getKey(), x.getValue())).collect(Collectors.toList());
         metadataFiltered.add(new KeyValuePair<>("collection", "test_collection"));
 
         // delete existing metadata
 
-        _client.Item.PutAsync(new Item.PutRequest() {{
-            Bucket = identifier;
-            Metadata = metadataFiltered;
-            DeleteExistingMetadata = true;
+        client.item.put(new Item.PutRequest() {{
+            bucket = identifier;
+            metadata = metadataFiltered;
+            deleteExistingMetadata = true;
         }});
 
-        WaitForServerAsync(identifier);
+        waitForServer(identifier);
 
-        try (var response2 = _client.Metadata.ReadAsync(identifier)) {
-            assertNotNull(response2);
-            AssertionsHasMetadata(response2, "title", identifier); // title reverts to identifier/bucket when removed
-            AssertionsNoMetadata(response2, "testfield");
-        }
+        var response2 = client.metadata.read(identifier);
+        assertNotNull(response2);
+        assertHasMetadata(response2, "title", identifier); // title reverts to identifier/bucket when removed
+        assertNoMetadata(response2, "testfield");
 
         // add another file
 
-        _client.Item.PutAsync(new Item.PutRequest() {{
-            Bucket = identifier;
-            LocalPath = Paths.get(_config.LocalFilename);
-            RemoteFilename = _remoteFilename2;
-            NoDerive = true;
+        client.item.put(new Item.PutRequest() {{
+            bucket = identifier;
+            localPath = Paths.get(config.localFilename);
+            remoteFilename = _remoteFilename2;
+            noDerive = true;
         }});
 
-        WaitForServerAsync(identifier);
+        waitForServer(identifier);
 
-        try (var response3 = _client.Metadata.ReadAsync(identifier)) {
-            assertNotNull(response3.Files.stream().filter(x -> x.Name.equals(_config.RemoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-            assertNotNull(response3.Files.stream().filter(x -> x.Name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-        }
+        var response3 = client.metadata.read(identifier);
+        assertNotNull(response3.files.stream().filter(x -> x.name.equals(config.remoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
+        assertNotNull(response3.files.stream().filter(x -> x.name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
 
         // delete file
 
-        _client.Item.DeleteAsync(new Item.DeleteRequest() {{
-            Bucket = identifier;
-            RemoteFilename = _remoteFilename2;
-            CascadeDelete = true;
-            KeepOldVersion = false;
+        client.item.delete(new Item.DeleteRequest() {{
+            bucket = identifier;
+            remoteFilename = _remoteFilename2;
+            cascadeDelete = true;
+            keepOldVersion = false;
         }});
 
-        WaitForServerAsync(identifier);
+        waitForServer(identifier);
 
-        try (var response4 = _client.Metadata.ReadAsync(identifier)) {
-            assertNotNull(response4.Files.stream().filter(x -> x.Name.equals(_config.RemoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-            Assertions.assertNull(response4.Files.stream().filter(x -> x.Name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-        }
+        var response4 = client.metadata.read(identifier);
+        assertNotNull(response4.files.stream().filter(x -> x.name.equals(config.remoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
+        Assertions.assertNull(response4.files.stream().filter(x -> x.name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
 
         // delete other file
 
-        _client.Item.DeleteAsync(new Item.DeleteRequest() {{
-            Bucket = identifier;
-            RemoteFilename = _config.RemoteFilename;
-            CascadeDelete = true;
-            KeepOldVersion = false;
+        client.item.delete(new Item.DeleteRequest() {{
+            bucket = identifier;
+            remoteFilename = config.remoteFilename;
+            cascadeDelete = true;
+            keepOldVersion = false;
         }});
 
-        WaitForServerAsync(identifier);
+        waitForServer(identifier);
 
-        try (Metadata.ReadResponse response5 = _client.Metadata.ReadAsync(identifier)) {
-            Assertions.assertNull(response5.Files.stream().filter(x -> x.Name.equals(_config.RemoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-            Assertions.assertNull(response5.Files.stream().filter(x -> x.Name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-        }
-        if (_config.CanDelete) {
-            _client.Tasks.SubmitAsync(identifier, Tasks.Command.Delete, null, null);
-            WaitForServerAsync(identifier);
+        Metadata.ReadResponse response5 = client.metadata.read(identifier);
+        Assertions.assertNull(response5.files.stream().filter(x -> x.name.equals(config.remoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
+        Assertions.assertNull(response5.files.stream().filter(x -> x.name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
+        if (config.canDelete) {
+            client.tasks.submit(identifier, Tasks.Command.Delete, null, null);
+            waitForServer(identifier);
         }
     }
 
     @Test
-    void CreateAddStreamAsync() throws Exception {
+    void createAddStream() throws Exception {
         String _remoteFilename2 = "hello; again #2.txt";
 
-        var identifier = CreateTestItemAsync(null, null);
+        var identifier = createTestItem(null, null);
 
         // add another file via stream
 
         var putRequest = new Item.PutRequest();
-        putRequest.Bucket = identifier;
-        putRequest.SourceStream = Files.newByteChannel(Path.of(_config.LocalFilename));
-        putRequest.RemoteFilename = _remoteFilename2;
-        putRequest.NoDerive = true;
+        putRequest.bucket = identifier;
+        putRequest.sourceStream = Files.newByteChannel(Path.of(config.localFilename));
+        putRequest.remoteFilename = _remoteFilename2;
+        putRequest.noDerive = true;
 
-        _client.Item.PutAsync(putRequest);
-        WaitForServerAsync(identifier);
+        client.item.put(putRequest);
+        waitForServer(identifier);
 
-        putRequest.SourceStream = Files.newByteChannel(Path.of(_config.LocalFilename));
-        VerifyHashesAsync(putRequest);
+        putRequest.sourceStream = Files.newByteChannel(Path.of(config.localFilename));
+        verifyHashes(putRequest);
 
-        try (var response = _client.Metadata.ReadAsync(identifier)) {
-            assertNotNull(response.Files.stream().filter(x -> x.Name.equals(_config.RemoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-            assertNotNull(response.Files.stream().filter(x -> x.Name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
-        }
+        var response = client.metadata.read(identifier);
+        assertNotNull(response.files.stream().filter(x -> x.name.equals(config.remoteFilename)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
+        assertNotNull(response.files.stream().filter(x -> x.name.equals(_remoteFilename2)).findFirst().orElseGet(Metadata.ReadResponse.File::new));
     }
 
-    private static Item.PutRequest CreateMultipartRequest(String identifier, boolean createBucket/* =true*/) {
+    private static Item.PutRequest createMultipartRequest(String identifier, boolean createBucket/* =true*/) {
         List<KeyValuePair<String, Object>> metadata = new ArrayList<>();
         metadata.add(new KeyValuePair<>("collection", "test_collection"));
         metadata.add(new KeyValuePair<>("mediatype", "texts"));
         metadata.add(new KeyValuePair<>("noindex", "true"));
 
         Item.PutRequest request = new Item.PutRequest();
-        request.Bucket = identifier;
-        request.LocalPath = _largeFilePath;
-        request.Metadata = metadata;
-        request.CreateBucket = createBucket;
-        request.NoDerive = true;
-        request.MultipartUploadMinimumSize = 0; // force multipart upload
-        request.MultipartUploadChunkSize = 1024 * 1024 * 5; // 5 MB chunks
+        request.bucket = identifier;
+        request.localPath = largeFilePath;
+        request.metadata = metadata;
+        request.createBucket = createBucket;
+        request.noDerive = true;
+        request.multipartUploadMinimumSize = 0; // force multipart upload
+        request.multipartUploadChunkSize = 1024 * 1024 * 5; // 5 MB chunks
         return request;
     }
 
     @Test
-    public void UploadMultipartCancelAsync() throws Exception {
-        String identifier = GenerateIdentifier();
-        var putRequest = CreateMultipartRequest(identifier, true);
+    public void uploadMultipartCancel() throws Exception {
+        String identifier = generateIdentifier();
+        var putRequest = createMultipartRequest(identifier, true);
 
         try {
-            _client.Item.PutAsync(putRequest, 3000);
+            client.item.put(putRequest, 3000);
             fail("CancellationToken ignored");
         } catch (Exception ex) {
             assertInstanceOf(InterruptedException.class, ex);
@@ -236,100 +234,53 @@ public class ItemTests extends Base {
     }
 
     @Test
-    public void UploadMultipartAbortImmediatelyAsync() throws Exception {
-        String identifier = GetSharedTestIdentifierAsync();
-        _client.Item.AbortUploadAsync(identifier);
+    public void uploadMultipartAbortImmediately() throws Exception {
+        String identifier = getSharedTestIdentifier();
+        client.item.abortUpload(identifier);
     }
 
     @Test
-    public void UploadMultipartAbortAsync() throws Exception {
-        String identifier = GenerateIdentifier();
-        var putRequest = CreateMultipartRequest(identifier, true);
-        _client.Item.PutAsync(putRequest);
+    public void uploadMultipartAbort() throws Exception {
+        String identifier = generateIdentifier();
+        var putRequest = createMultipartRequest(identifier, true);
+        client.item.put(putRequest);
 
         Thread.sleep(20 * 1000);
-        _client.Item.AbortUploadAsync(putRequest);
+        client.item.abortUpload(putRequest);
     }
 
     @Test
-    public void UploadMultipartAsync() throws Exception {
-        String identifier = GenerateIdentifier();
+    public void uploadMultipart() throws Exception {
+        String identifier = generateIdentifier();
 
-        var putRequest = CreateMultipartRequest(identifier, true);
-        _client.Item.PutAsync(putRequest);
+        var putRequest = createMultipartRequest(identifier, true);
+        client.item.put(putRequest);
 
-        WaitForServerAsync(identifier);
-        VerifyHashesAsync(putRequest);
+        waitForServer(identifier);
+        verifyHashes(putRequest);
     }
 
     @Test
-    public void UploadMultipartWithContinueAsync() throws Exception {
-        String identifier = GenerateIdentifier();
+    public void uploadMultipartWithContinue() throws Exception {
+        String identifier = generateIdentifier();
 
-        var putRequest = CreateMultipartRequest(identifier, true);
-        putRequest.MultipartUploadSkipParts = List.of(1, 2);
+        var putRequest = createMultipartRequest(identifier, true);
+        putRequest.multipartUploadSkipParts = List.of(1, 2);
 
-        _client.Item.PutAsync(putRequest);
+        client.item.put(putRequest);
 
-        putRequest = CreateMultipartRequest(identifier, false);
-        _client.Item.PutAsync(putRequest);
+        putRequest = createMultipartRequest(identifier, false);
+        client.item.put(putRequest);
 
-        WaitForServerAsync(identifier);
-        VerifyHashesAsync(putRequest);
+        waitForServer(identifier);
+        verifyHashes(putRequest);
     }
 
     @Test
-    @Disabled("original deleted")
-    public void AbortUpload() throws Exception {
-        String identifier = _config.TestItem;
-        var putRequest = CreateMultipartRequest(identifier, true);
+    public void head() throws Exception {
+        Item.HeadRequest headRequest = new Item.HeadRequest(config.testBucket, config.remoteFilename);
 
-        _client.Item.AbortUploadAsync(putRequest);
-        WaitForServerAsync(identifier);
-    }
-
-    @Test
-    @Disabled("original deleted")
-    public void AbortAllBucketUploads() throws Exception {
-        String identifier = _config.TestItem;
-
-        _client.Item.AbortUploadAsync(identifier);
-        WaitForServerAsync(identifier);
-    }
-
-    @Test
-    @Disabled("original deleted")
-    public void StartThenAbortUpload() throws Exception {
-        String identifier = "etc-tmp-{Guid.NewGuid():N}";
-        Item.PutRequest putRequest = CreateMultipartRequest(identifier, true);
-
-        putRequest.MultipartUploadSkipParts = List.of(1, 2);
-
-        _client.Item.PutAsync(putRequest);
-        WaitForServerAsync(identifier);
-
-        _client.Item.AbortUploadAsync(putRequest);
-    }
-
-    @Test
-    @Disabled("original deleted")
-    public void UploadMultipart() throws IOException, InterruptedException {
-        String identifier = "etc-tmp-{Guid.NewGuid():N}";
-        _client.Item.PutAsync(CreateMultipartRequest(identifier, true));
-    }
-
-    @Test
-    @Disabled("original deleted")
-    public void UploadMultipartExistingWithContinue() throws Exception {
-        String identifier = _config.TestItem;
-        Item.PutRequest putRequest = CreateMultipartRequest(identifier, /*createBucket:*/false);
-        putRequest.MultipartUploadSkipParts = List.of(1, 2);
-
-        _client.Item.PutAsync(putRequest);
-
-        putRequest.MultipartUploadSkipParts = new ArrayList<>();
-        _client.Item.PutAsync(putRequest);
-
-        WaitForServerAsync(identifier);
+        HttpResponse<?> r = client.item.head(headRequest);
+        assertEquals(200, r.statusCode());
     }
 }

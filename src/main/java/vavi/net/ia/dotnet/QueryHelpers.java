@@ -1,5 +1,5 @@
 // Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+// Licensed under the Apache License, version 2.0. See License.txt in the project root for license information.
 
 package vavi.net.ia.dotnet;
 
@@ -24,7 +24,7 @@ public class QueryHelpers {
      * @param value The query value.
      * @returns The combined result.
      */
-    public static String AddQueryString(String uri, String name, String value) {
+    public static String addQueryString(String uri, String name, String value) {
         if (uri == null) {
             throw new IllegalArgumentException("uri");
         }
@@ -37,7 +37,7 @@ public class QueryHelpers {
             throw new IllegalArgumentException("value");
         }
 
-        return AddQueryString(uri, List.of(new KeyValuePair<>(name, value)));
+        return addQueryString(uri, List.of(new KeyValuePair<>(name, value)));
     }
 
     /**
@@ -47,7 +47,7 @@ public class QueryHelpers {
      * @param queryString A collection of name value query pairs to append.
      * @return The combined result.
      */
-    public static String AddQueryString(String uri, Map<String, String> queryString) {
+    public static String addQueryString(String uri, Map<String, String> queryString) {
         if (uri == null) {
             throw new IllegalArgumentException("uri");
         }
@@ -56,10 +56,10 @@ public class QueryHelpers {
             throw new IllegalArgumentException("queryString");
         }
 
-        return AddQueryString(uri, queryString.entrySet());
+        return addQueryString(uri, queryString.entrySet());
     }
 
-    public static String AddQueryString(
+    public static String addQueryString(
             String uri,
             Iterable<Map.Entry<String, String>> queryString) {
         if (uri == null) {

@@ -6,55 +6,56 @@ import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import com.google.gson.annotations.SerializedName;
 import vavi.net.ia.dotnet.KeyValuePair;
 
 
 public class Changes {
 
-    private static final String Url = "https://be-api.us.archive.org/changes/v1";
+    private static final String url = "https://be-api.us.archive.org/changes/v1";
 
-    private final Client _client;
+    private final Client client;
 
     public Changes(Client client) {
-        _client = client;
+        this.client = client;
     }
 
     public static class GetResponse {
-        @JacksonXmlProperty(localName = "estimated_distance_from_head")
-        public int EstimatedDistanceFromHead;
+        @SerializedName("estimated_distance_from_head")
+        public int estimatedDistanceFromHead;
 
-        @JacksonXmlProperty(localName = "do_sleep_before_returning")
-        public boolean SleepBeforeReturning;
+        @SerializedName("do_sleep_before_returning")
+        public boolean sleepBeforeReturning;
 
         public static class Change {
-            public String Identifier = null;
+            public String identifier = null;
         }
 
-        public List<Change> Changes;
+        public List<Change> changes;
 
-        @JacksonXmlProperty(localName = "next_token")
-        public String Token;
+        @SerializedName("next_token")
+        public String token;
 
-        public List<Change> Identifiers() {
-            return Changes.stream().filter(x -> x.Identifier != null).collect(Collectors.toList());
+        public List<Change> identifiers() {
+            return changes.stream().filter(x -> x.identifier != null).collect(Collectors.toList());
         }
     }
 
-    private GetResponse GetHelperAsync(String token/* = null*/, LocalDateTime startDate/*= null*/, Boolean fromBeginning/* = null*/) throws IOException, InterruptedException {
+    private GetResponse getHelper(String token/* = null*/, LocalDateTime startDate/*= null*/, Boolean fromBeginning/* = null*/) throws IOException, InterruptedException {
         List<KeyValuePair<String, String>> formData = new ArrayList<>();
-        formData.add(new KeyValuePair<>("access", _client.AccessKey));
-        formData.add(new KeyValuePair<>("secret", _client.SecretKey));
+        formData.add(new KeyValuePair<>("access", client.accessKey));
+        formData.add(new KeyValuePair<>("secret", client.secretKey));
 
         if (token != null) formData.add(new KeyValuePair<>("token", token));
 
         if (startDate != null) {
-            formData.add(new KeyValuePair<>("start_date", "{startDate:yyyyMMdd}"));
-        } else if (fromBeginning) {
+            formData.add(new KeyValuePair<>("start_date", startDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"))));
+        } else if (fromBeginning != null && fromBeginning) {
             formData.add(new KeyValuePair<>("start_date", "0"));
         }
 
@@ -62,31 +63,29 @@ public class Changes {
                 .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
 
-        var response = _client.<GetResponse>SendAsync("POST", Url, "application/x-www-form-urlencoded", HttpRequest.BodyPublishers.ofString(form), GetResponse.class);
+        var response = client.send("POST", url, "application/x-www-form-urlencoded", HttpRequest.BodyPublishers.ofString(form), GetResponse.class);
         if (response == null) throw new IllegalStateException("null response from server");
 
         return response;
     }
 
-    public GetResponse GetFromBeginningAsync() throws IOException, InterruptedException {
-        return GetHelperAsync(null, null, /*fromBeginning:*/ true);
+    public GetResponse getFromBeginning() throws IOException, InterruptedException {
+        return getHelper(null, null, true);
     }
 
-    public GetResponse GetStartingNowAsync() throws IOException, InterruptedException {
-        return GetHelperAsync(null, null, null);
+    public GetResponse getStartingNow() throws IOException, InterruptedException {
+        return getHelper(null, null, null);
     }
 
-    public GetResponse GetAsync(String token) throws IOException, InterruptedException {
-        return GetHelperAsync(token, null, null);
+    public GetResponse get(String token) throws IOException, InterruptedException {
+        return getHelper(token, null, null);
     }
 
-    public GetResponse GetAsync(LocalDateTime startDate) throws IOException, InterruptedException {
-        return GetHelperAsync(null, /*startDate:*/ startDate, null);
+    public GetResponse get(LocalDateTime startDate) throws IOException, InterruptedException {
+        return getHelper(null, startDate, null);
     }
 
-//#if NET
-    public GetResponse GetAsync(LocalDate startDate) {
-        return GetAsync(LocalDate.of(startDate.getYear(), startDate.getMonth(), startDate.getDayOfMonth()));
+    public GetResponse get(LocalDate startDate) throws IOException, InterruptedException {
+        return getHelper(null, LocalDateTime.of(startDate.getYear(), startDate.getMonth(), startDate.getDayOfMonth(), 0, 0), null);
     }
-//#endif
 }

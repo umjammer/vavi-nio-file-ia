@@ -6,127 +6,126 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.annotations.SerializedName;
 import vavi.net.ia.dotnet.KeyValuePair;
+import vavi.util.Debug;
 
 
+/**
+ * @see "https://archive.org/developers/metadata.html"
+ */
 public class Metadata {
 
-    static String Url(String identifier) {
+    static String url(String identifier) {
         return "https://archive.org/metadata/" + identifier;
     }
 
-    private final Client _client;
+    private final Client client;
 
     public Metadata(Client client) {
-        _client = client;
+        this.client = client;
     }
 
-    public static class ReadResponse implements Closeable {
+    public static class ReadResponse {
 
-        @JacksonXmlProperty(localName = "created")
-        @JsonAdapter(UnixEpochDateTimeNullableDeserializer.class)
-        public LocalDateTime DateCreated;
+        @SerializedName("created")
+        @JsonAdapter(JsonConverters.UnixEpochDateTimeNullableConverter.class)
+        public LocalDateTime dateCreated;
 
-        @JacksonXmlProperty(localName = "d1")
-        public String DataNodePrimary = null;
+        @SerializedName("d1")
+        public String dataNodePrimary = null;
 
-        @JacksonXmlProperty(localName = "d2")
-        public String DataNodeSecondary;
+        @SerializedName("d2")
+        public String dataNodeSecondary;
 
-        @JacksonXmlProperty(localName = "solo")
-        public Boolean DataNodeSolo;
+        @SerializedName("solo")
+        public Boolean dataNodeSolo;
 
-        @JacksonXmlProperty(localName = "is_dark")
-        public boolean IsDark;
+        @SerializedName("is_dark")
+        public boolean isDark;
 
-        public String Dir = null;
+        public String dir = null;
 
-        public List<File> Files;
+        public List<File> files;
 
         public static class File {
 
-            public String Name;
-            public String Source;
-            public String Original;
+            public String name;
+            public String source;
+            public String original;
 
-            @JacksonXmlProperty(localName = "mtime")
-            @JsonAdapter(UnixEpochDateTimeNullableDeserializer.class)
-            public OffsetDateTime ModificationDate;
+            @SerializedName("mtime")
+            @JsonAdapter(JsonConverters.UnixEpochDateTimeNullableConverter.class)
+            public LocalDateTime modificationDate;
 
-            //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-            public Long Size;
+            //@JsonAdapter(JsonConverters.NumberAdapter.class)
+            public Long size;
 
-            public String Md5;
-            public String Crc32;
-            public String Sha1;
+            public String md5;
+            public String crc32;
+            public String sha1;
 
-            public String Btih;
-            public String Summation;
-            public String Format;
+            public String btih;
+            public String summation;
+            public String format;
 
-            //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-            public float Length;
+            //@JsonAdapter(JsonConverters.NumberAdapter.class)
+            public float length;
 
-            //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-            public int Width;
+            //@JsonAdapter(JsonConverters.NumberAdapter.class)
+            public int width;
 
-            //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-            public int Height;
+            //@JsonAdapter(JsonConverters.NumberAdapter.class)
+            public int height;
 
-            //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-            public int Rotation;
+            //@JsonAdapter(JsonConverters.NumberAdapter.class)
+            public int rotation;
 
-            @JacksonXmlProperty(localName = "viruscheck")
-            @JsonAdapter(UnixEpochDateTimeNullableDeserializer.class)
-            public LocalDateTime VirusCheckDate;
+            @SerializedName("viruscheck")
+            @JsonAdapter(JsonConverters.UnixEpochDateTimeNullableConverter.class)
+            public LocalDateTime virusCheckDate;
         }
 
-        public JsonObject Metadata;
+        public JsonObject metadata;
 
-        @JacksonXmlProperty(localName = "item_last_updated")
-        @JsonAdapter(UnixEpochDateTimeNullableDeserializer.class)
-        public LocalDateTime DateLastUpdated;
+        @SerializedName("item_last_updated")
+        @JsonAdapter(JsonConverters.UnixEpochDateTimeNullableConverter.class)
+        public LocalDateTime dateLastUpdated;
 
-        @JacksonXmlProperty(localName = "item_size")
-        public Long Size;
+        @SerializedName("item_size")
+        public Long size;
 
-        public Long Uniq;
+        public Long uniq;
 
-        @JacksonXmlProperty(localName = "servers_unavailable")
-        public boolean ServersUnavailable;
+        @SerializedName("servers_unavailable")
+        public boolean serversUnavailable;
 
-        @JacksonXmlProperty(localName = "workable_servers")
-        @JsonAdapter(EnumerableStringDeserializer.class)
-        public String[] WorkableServers;
-
-        public void close() {
-//            Metadata.close();
-            Metadata = null;
-        }
+        @SerializedName("workable_servers")
+        public List<String> workableServers;
     }
 
-    public ReadResponse ReadAsync(String identifier) throws IOException, InterruptedException {
-        return _client.GetAsync(identifier, null, ReadResponse.class);
+    public ReadResponse read(String identifier) throws IOException, InterruptedException {
+        return client.get(url(identifier), null, ReadResponse.class);
     }
 
     public static class WriteResponse extends ServerResponse {
 
-        @JacksonXmlProperty(localName = "task_id")
-        public Long TaskId;
+        @SerializedName("task_id")
+        public Long taskId;
 
-        public String Log;
-        public String Error;
+        public String log;
+        public String error;
     }
 
-    WriteResponse WriteAsync(String url, String target, String json) throws IOException, InterruptedException {
+    WriteResponse write(String url, String target, String json) throws IOException, InterruptedException {
         List<KeyValuePair<String, String>> formData = new ArrayList<>();
         formData.add(new KeyValuePair<>("-target", target));
         formData.add(new KeyValuePair<>("-patch", json));
@@ -134,15 +133,16 @@ public class Metadata {
         String form = formData.stream()
                 .map(e -> e.getKey() + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
-
+Debug.println(Level.FINER, "post: " + form);
         HttpRequest.BodyPublisher httpContent = HttpRequest.BodyPublishers.ofString(form);
-        WriteResponse writeMetadataResponse = _client.SendAsync("POST", url, httpContent, WriteResponse.class);
+        WriteResponse writeMetadataResponse = client.send("POST", url, "application/x-www-form-urlencoded", httpContent, WriteResponse.class);
 
-        writeMetadataResponse.EnsureSuccess();
+        writeMetadataResponse.ensureSuccess();
         return writeMetadataResponse;
     }
 
-    public WriteResponse WriteAsync(String identifier, String patch) throws IOException, InterruptedException {
-        return WriteAsync(Url(identifier), "metadata", patch);
+    public WriteResponse write(String identifier, String patch) throws IOException, InterruptedException {
+Debug.println(Level.FINER, "patch: " + patch);
+        return write(url(identifier), "metadata", patch);
     }
 }

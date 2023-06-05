@@ -2,168 +2,160 @@ package vavi.net.ia;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.google.gson.JsonObject;
-import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.annotations.SerializedName;
 
 
 public class Search {
 
-    private final String Url = "https://archive.org/services/search/v1/scrape";
+    private static final String url = "https://archive.org/services/search/v1/scrape";
 
-    private final Client _client;
+    private final Client client;
 
     public Search(Client client) {
-        _client = client;
+        this.client = client;
     }
 
     public static class ScrapeRequest {
 
-        public String Query;
-        public List<String> Sorts;
-        public List<String> Fields;
-        public Integer Count;
-        public String Cursor;
-        public boolean TotalOnly;
+        public String query;
+        public List<String> sorts;
+        public List<String> fields;
+        public Integer count;
+        public String cursor;
+        public boolean totalOnly;
     }
 
     public static class ScrapeResponse {
 
-        public List<ScrapeResponseItem> Items = Collections.emptyList();
-        public int Count;
-        public String Cursor;
-        public long Total;
+        public List<ScrapeResponseItem> items = Collections.emptyList();
+        public Integer count;
+        public String cursor;
+        public Long total;
     }
 
     public static class ScrapeResponseItem {
 
-        @JacksonXmlProperty(localName = "avg_rating")
-        public int AverageRating;
+        @SerializedName("avg_rating")
+        public int averageRating;
 
-        public LocalDateTime AddedDate;
+        public LocalDateTime addedDate;
 
-        @JacksonXmlProperty(localName = "backup_location")
-        public String BackupLocation;
+        @SerializedName("backup_location")
+        public String backupLocation;
 
-        public String Btih;
+        public String btih;
 
-        @JacksonXmlProperty(localName = "call_number")
-        public String CallNumber;
+        @SerializedName("call_number")
+        public String callNumber;
 
-        @JacksonXmlProperty(localName = "collection")
-        @JsonAdapter(EnumerableStringDeserializer.class)
-        public List<String> Collections;
+        @SerializedName("collection")
+        public List<String> collections;
 
-        public String Contributor;
-        public String Coverage;
-        public String Creator;
-        public String Date;
+        public String contributor;
+        public String coverage;
+        public String creator;
+        public String date;
 
-        @JsonAdapter(EnumerableStringDeserializer.class)
-        @JacksonXmlProperty(localName = "description")
-        public List<String> Descriptions;
+        @SerializedName("description")
+        public List<String> descriptions;
 
-        public long Downloads;
+        public long downloads;
 
-        @JacksonXmlProperty(localName = "external-identifier")
-        @JsonAdapter(EnumerableStringDeserializer.class)
-        public List<String> ExternalIdentifiers;
+        @SerializedName("external-identifier")
+        public List<String> externalIdentifiers;
 
-        public int FilesCount;
-        public int FoldoutCount;
+        public int filesCount;
+        public int foldoutCount;
 
-        @JacksonXmlProperty(localName = "format")
-        @JsonAdapter(EnumerableStringDeserializer.class)
-        public List<String> Formats;
+        @SerializedName("format")
+        public List<String> formats;
 
-        public String Genre;
-        public String Identifier;
+        public String genre;
+        public String identifier;
 
-        //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-        public int ImageCount;
+        //@JsonAdapter(JsonConverters.NumberAdapter.class)
+        public int imageCount;
 
-        public String IndexFlag;
+        public String indexFlag;
 
-        @JacksonXmlProperty(localName = "item_size")
-        //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-        public long ItemSize;
+        @SerializedName("item_size")
+        //@JsonAdapter(JsonConverters.NumberAdapter.class)
+        public long itemSize;
 
-        @JacksonXmlProperty(localName = "language")
-        //@JsonAdapter(EnumerableStringConverter.class)
-        public List<String> Languages;
+        @SerializedName("language")
+        public List<String> languages;
 
-        public String LicenseUrl;
-        public String MediaType;
-        public String Members;
-        public String Month;
-        public String Name;
-        public String NoIndex;
+        public String licenseUrl;
+        public String mediaType;
+        public String members;
+        public String month;
+        public String name;
+        public String noIndex;
 
-        @JacksonXmlProperty(localName = "num_reviews")
-        //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-        public int NumReviews;
+        @SerializedName("num_reviews")
+        //@JsonAdapter(JsonConverters.NumberAdapter.class)
+        public int numReviews;
 
-        @JacksonXmlProperty(localName = "oai_updatedate")
-        public List<OffsetDateTime> OaiUpdateDate;
+        @SerializedName("oai_updatedate")
+        public List<ZonedDateTime> oaiUpdateDate;
 
-        @JacksonXmlProperty(localName = "primary_collection")
-        public String PrimaryCollection;
+        @SerializedName("primary_collection")
+        public String primaryCollection;
 
-        public LocalDateTime PublicDate;
-        public String Publisher;
+        public LocalDateTime publicDate;
+        public String publisher;
 
-        @JacksonXmlProperty(localName = "related-external-id")
-        @JsonAdapter(EnumerableStringDeserializer.class)
-        public List<String> RelatedExternalIds;
+        @SerializedName("related-external-id")
+        public List<String> relatedExternalIds;
 
-        @JacksonXmlProperty(localName = "reported-server")
-        public String ReportedServer;
+        @SerializedName("reported-server")
+        public String reportedServer;
 
-        @JacksonXmlProperty(localName = "reviewdate")
-        public LocalDateTime ReviewDate;
+        @SerializedName("reviewdate")
+        public LocalDateTime reviewDate;
 
-        public String Rights;
-        public String Scanner;
-        public String ScanningCentre;
-        public String Source;
+        public String rights;
+        public String scanner;
+        public String scanningCentre;
+        public String source;
 
-        @JacksonXmlProperty(localName = "stripped_tags")
-        public String StrippedTags;
+        @SerializedName("stripped_tags")
+        public String strippedTags;
 
-        @JacksonXmlProperty(localName = "subject")
-        @JsonAdapter(EnumerableStringDeserializer.class)
-        public List<String> Subjects;
+        @SerializedName("subject")
+        public List<String> subjects;
 
-        public String Title;
-        public String Type;
-        public String Volume;
+        public String title;
+        public String type;
+        public String volume;
 
-        //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-        public int Week;
+        //@JsonAdapter(JsonConverters.NumberAdapter.class)
+        public int week;
 
-        //@JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)
-        public int Year;
+        //@JsonAdapter(JsonConverters.NumberAdapter.class)
+        public int year;
     }
 
-    Map<String, String> ScrapeHelper(ScrapeRequest request) {
+    Map<String, String> scrapeHelper(ScrapeRequest request) {
         Map<String, String> query = new HashMap<>();
 
-        if (request.Query != null) query.put("q", request.Query);
-        if (request.Fields != null) query.put("fields", String.join(",", request.Fields));
-        if (request.Count != null) query.put("count", String.valueOf(request.Count));
-        if (request.TotalOnly) query.put("total_only", "true");
+        if (request.query != null) query.put("q", request.query);
+        if (request.fields != null) query.put("fields", String.join(",", request.fields));
+        if (request.count != null) query.put("count", String.valueOf(request.count));
+        if (request.totalOnly) query.put("total_only", "true");
 
-        List<String> sorts = request.Sorts;
+        List<String> sorts = request.sorts;
         if (sorts.contains("identifier") && sorts.size() > 1) {
             // if identifier is specified, it must be last
-            sorts = request.Sorts.stream().filter(x -> !x.equalsIgnoreCase("identifier")).collect(Collectors.toList());
+            sorts = request.sorts.stream().filter(x -> !x.equalsIgnoreCase("identifier")).collect(Collectors.toList());
             sorts.add("identifier");
         }
         if (sorts != null) query.put("sorts", String.join(",", sorts));
@@ -171,13 +163,13 @@ public class Search {
         return query;
     }
 
-    public ScrapeResponse ScrapeAsync(ScrapeRequest request) throws IOException, InterruptedException {
-        Map<String, String> query = ScrapeHelper(request);
-        return _client.GetAsync(Url, query, ScrapeResponse.class);
+    public ScrapeResponse scrape(ScrapeRequest request) throws IOException, InterruptedException {
+        Map<String, String> query = scrapeHelper(request);
+        return client.get(url, query, ScrapeResponse.class);
     }
 
-    public JsonObject ScrapeAsJsonAsync(ScrapeRequest request) throws IOException, InterruptedException {
-        Map<String, String> query = ScrapeHelper(request);
-        return _client.GetAsync(Url, query, JsonObject.class);
+    public JsonObject scrapeAsJson(ScrapeRequest request) throws IOException, InterruptedException {
+        Map<String, String> query = scrapeHelper(request);
+        return client.get(url, query, JsonObject.class);
     }
 }

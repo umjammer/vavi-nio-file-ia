@@ -2,6 +2,8 @@ package vavi.net.ia;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import vavi.util.Debug;
+import vavi.util.StringUtil;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -9,70 +11,73 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class RelationshipTests extends Base {
 
     @Test
-    public void AddRemoveListAsync() throws Exception {
-        if (_config.TestCollection == null || _config.TestCollection.isEmpty()) {
-            fail("Skipping test because _config.TestCollection is null");
+    public void addRemoveList() throws Exception {
+        if (config.testCollection == null || config.testCollection.isEmpty()) {
+            fail("Skipping test because config.testCollection is null");
         }
 
-        String identifier = GetSharedTestIdentifierAsync();
+        String identifier = getSharedTestIdentifier();
 
-        var response = _client.Relationships.AddAsync(identifier, _config.TestCollection, _config.TestList, null);
-        Assertions.assertTrue(response.Success);
+        var response = client.relationships.add(identifier, config.testCollection, config.testList, null);
+        Assertions.assertTrue(response.success);
 
-        var parents = _client.Relationships.GetParentsAsync(identifier);
-        Assertions.assertTrue(parents.Lists.containsKey(_config.TestCollection), "vavi.net.ia.Item not added to collection");
+        var parents = client.relationships.getParents(identifier);
+        Assertions.assertTrue(parents.lists.containsKey(config.testCollection), "vavi.net.ia.item not added to collection");
 
-        var children = _client.Relationships.GetChildrenAsync(_config.TestCollection, _config.TestList, null, null);
+        var children = client.relationships.getChildren(config.testCollection, config.testList, null, null);
         Assertions.assertNotNull(children);
         // can't test this because query API is not in immediate sync with metadata API and there is no identifier to wait on
-        // WaitForServerAsync(_config.TestCollection)
+        // WaitForServer(config.testCollection)
 
-        response = _client.Relationships.RemoveAsync(identifier, _config.TestCollection, _config.TestList);
-        Assertions.assertTrue(response.Success);
+        response = client.relationships.remove(identifier, config.testCollection, config.testList);
+        Assertions.assertTrue(response.success);
 
-        parents = _client.Relationships.GetParentsAsync(identifier);
-        Assertions.assertNotNull(parents.Error); // no parent so returns error String
-        Assertions.assertFalse(parents.Lists.containsKey(_config.TestCollection), "vavi.net.ia.Item not removed from collection");
+        parents = client.relationships.getParents(identifier);
+        Assertions.assertNotNull(parents.error); // no parent so returns error String
+        Assertions.assertFalse(parents.lists.containsKey(config.testCollection), "vavi.net.ia.item not removed from collection");
     }
 
     @Test
-    public void ParentChildAsync() throws Exception {
-        var children = _client.Relationships.GetChildrenAsync(_config.TestParent, null, /*rows:*/ 1, null);
+    public void parentChild() throws Exception {
+        var children = client.relationships.getChildren(config.testParent, null, /*rows:*/ 1, null);
+Debug.println(StringUtil.paramString(children));
 
-        String testChild = children.Identifiers().stream().findFirst().orElse("");
-        Assertions.assertNotNull(testChild);
+        var testChild = children.identifiers().stream().findFirst();
+        Assertions.assertTrue(testChild.isPresent());
 
-        var parents = _client.Relationships.GetParentsAsync(testChild);
-        Assertions.assertTrue(parents.Lists.containsKey(_config.TestParent));
+        var parents = client.relationships.getParents(testChild.get());
+Debug.println(parents.lists);
+Debug.println(config.testParent);
+        Assertions.assertTrue(parents.lists.containsKey(config.testParent));
     }
 
     @Test
-    public void GetChildrenAsync() throws Exception {
-        Relationships.GetChildrenResponse children = _client.Relationships.GetChildrenAsync(_config.TestParent, null, /*rows:*/ 7, null);
+    public void getChildren() throws Exception {
+        Relationships.GetChildrenResponse children = client.relationships.getChildren(config.testParent, null, /*rows:*/ 7, null);
 
         Assertions.assertNotNull(children);
-        Assertions.assertNotNull(children.Response);
-        Assertions.assertNotNull(children.Response.Docs);
-        Assertions.assertNotNull(children.Response.NumFound);
-        Assertions.assertNotNull(children.Response.Start);
+        Assertions.assertNotNull(children.response);
+        Assertions.assertNotNull(children.response.docs);
+        Assertions.assertNotNull(children.response.numFound);
+        Assertions.assertNotNull(children.response.start);
 
-        Assertions.assertEquals(7, children.Response.Docs.size());
+        Assertions.assertEquals(7, children.response.docs.size());
     }
 
     @Test
-    public void GetParentsAsync() throws Exception {
-        var parents = _client.Relationships.GetParentsAsync(_config.TestChild);
+    public void getParents() throws Exception {
+        var parents = client.relationships.getParents(config.testChild);
 
         Assertions.assertNotNull(parents);
-        Assertions.assertNotNull(parents.Lists);
+        Assertions.assertNotNull(parents.lists);
 
-        var list = parents.Lists.entrySet().stream().findFirst().get();
-        Assertions.assertEquals(_config.TestParent, list.getKey());
+        var list = parents.lists.entrySet().stream().findFirst().get();
+        Assertions.assertEquals(config.testParent, list.getKey());
 
         Assertions.assertNotNull(list.getValue());
-        Assertions.assertNotNull(list.getValue().LastChangedBy);
-        Assertions.assertNotNull(list.getValue().LastChangedDate);
+        Assertions.assertNotNull(list.getValue().lastChangedBy);
+        Assertions.assertNotNull(list.getValue().lastChangedDate);
 
-        Assertions.assertNotNull(list.getValue().Notes);
+        Assertions.assertNotNull(list.getValue().notes);
     }
 }

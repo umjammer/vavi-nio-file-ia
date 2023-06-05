@@ -1,56 +1,59 @@
 package vavi.net.ia;
 
 import java.time.LocalDate;
+import java.util.List;
 
-import org.junit.jupiter.api.Assertions;
+import com.google.gson.annotations.JsonAdapter;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 
 public class BoundTests extends Base {
 
     @Test
-    public void EnumerableStringNullableConverter() {
+    public void enumerableStringNullableConverter() {
         Metadata.ReadResponse response = new Metadata.ReadResponse();
-        var json = Client._json.toJson(response);
+        var json = Client.gson.toJson(response);
 
-        try (Metadata.ReadResponse test = Client._json.fromJson(json, Metadata.ReadResponse.class)) {
+        Metadata.ReadResponse test = Client.gson.fromJson(json, Metadata.ReadResponse.class);
 
-            Assertions.assertNotNull(test);
-            Assertions.assertNull(test.WorkableServers);
+        assertNotNull(test);
+        assertNull(test.workableServers);
 
-            try (var test2 = Client._json.fromJson("{\"workable_servers\":\"1\"}", Metadata.ReadResponse.class)) {
+        var test2 = Client.gson.fromJson("{\"workable_servers\":\"1\"}", Metadata.ReadResponse.class);
 
-                Assertions.assertEquals(1, test2.WorkableServers.length);
-            }
-            response.WorkableServers = new String[] {"1", "2"};
+        assertEquals(1, test2.workableServers.size());
+        response.workableServers = List.of("1", "2");
 
-            json = Client._json.toJson(response);
-            try (var test3 = Client._json.fromJson(json, Metadata.ReadResponse.class)) {
-                Assertions.assertEquals(2, test3.WorkableServers.length);
-            }
-        }
+        json = Client.gson.toJson(response);
+        var test3 = Client.gson.fromJson(json, Metadata.ReadResponse.class);
+        assertEquals(2, test3.workableServers.size());
     }
 
     public static class TestLocalDate {
 
-        public LocalDate TestDate;
+        @JsonAdapter(JsonConverters.LocalDateNullableConverter.class)
+        public LocalDate testDate;
     }
 
     @Test
-    public void LocalDateConverter() {
+    public void localDateConverter() {
         LocalDate testDate = LocalDate.of(2001, 1, 25);
 
         TestLocalDate response = new TestLocalDate();
-        response.TestDate = testDate;
-        var json = Client._json.toJson(response);
+        response.testDate = testDate;
+        var json = Client.gson.toJson(response);
 
-        var test = Client._json.fromJson(json, TestLocalDate.class);
-        Assertions.assertNotNull(test);
-        Assertions.assertEquals(testDate, test.TestDate);
+        var test = Client.gson.fromJson(json, TestLocalDate.class);
+        assertNotNull(test);
+        assertEquals(testDate, test.testDate);
 
-        json = "{ \"TestDate\" : null }";
-        test = Client._json.fromJson(json, TestLocalDate.class);
-        Assertions.assertNotNull(test);
-        Assertions.assertNull(test.TestDate);
+        json = "{ \"testDate\" : null }";
+        test = Client.gson.fromJson(json, TestLocalDate.class);
+        assertNotNull(test);
+        assertNull(test.testDate);
     }
 }

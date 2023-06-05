@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 
 public class ServiceExtensions {
 
-    public static HttpClient AddInternetArchiveServices(Duration timeout/*=null*/) {
+    public static HttpClient addInternetArchiveServices(Duration timeout/*=null*/) {
 
         Duration Timeout = timeout != null ? Duration.ofMinutes(15) : null;
         HttpClient.Builder handler = HttpClient.newBuilder();
@@ -24,7 +24,7 @@ public class ServiceExtensions {
         return handler.build();
     }
 
-    public static void AddInternetArchiveDefaultRetryPolicies() {
+    public static void addInternetArchiveDefaultRetryPolicies() {
         Logger logger = Logger.getLogger(Client.class.getName());
 
         Set<Integer> noRetryCodes = new HashSet<>();
@@ -39,7 +39,7 @@ public class ServiceExtensions {
             var delays = new Duration[] {Duration.ofSeconds(2), Duration.ofSeconds(4), Duration.ofSeconds(8)};
             int retryAttempt = 0;
             if (r.statusCode() / 200 != 1 && !noRetryCodes.contains(r.statusCode())) {
-                logger.info(String.format("HTTP status %d retry #%d delay %s", r.statusCode(), retryAttempt, delays[retryAttempt]));
+                logger.fine(String.format("HTTP status %d retry #%d delay %s", r.statusCode(), retryAttempt, delays[retryAttempt]));
             }
         };
 
@@ -47,7 +47,7 @@ public class ServiceExtensions {
             if (r.statusCode() == 404 && (r.request() != null && Objects.equals(r.request().method(), "PUT"))) {
                 var delays = new Duration[] {Duration.ofSeconds(10), Duration.ofSeconds(20), Duration.ofSeconds(60)};
                 int retryAttempt = 0;
-                logger.info(String.format("HTTP PUT status %d retry #%d delay %s", r.statusCode(), retryAttempt, delays[retryAttempt]));
+                logger.fine(String.format("HTTP PUT status %d retry #%d delay %s", r.statusCode(), retryAttempt, delays[retryAttempt]));
             }
         };
 
@@ -55,7 +55,7 @@ public class ServiceExtensions {
             if (r.statusCode() == 504) {
                 var delays = new Duration[] {Duration.ofSeconds(60), Duration.ofSeconds(120), Duration.ofSeconds(180)};
                 int retryAttempt = 0;
-                logger.info(String.format("HTTP error %d retry #%d delay %s", r.statusCode(), retryAttempt, delays[retryAttempt]));
+                logger.fine(String.format("HTTP error %d retry #%d delay %s", r.statusCode(), retryAttempt, delays[retryAttempt]));
             }
         };
 
@@ -73,7 +73,7 @@ public class ServiceExtensions {
                     return (Duration) duration;
                 };
                 int retryAttempt = 0;
-                logger.info(String.format("HTTP error %d retry #%d delay %s", (int) r.statusCode(), retryAttempt, x.get()));
+                logger.fine(String.format("HTTP error %d retry #%d delay %s", (int) r.statusCode(), retryAttempt, x.get()));
             }
         };
     }

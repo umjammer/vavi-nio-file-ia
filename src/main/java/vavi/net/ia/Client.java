@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.lang.reflect.Type;
 import java.net.Authenticator;
 import java.net.PasswordAuthentication;
 import java.net.URI;
@@ -11,6 +12,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -20,97 +23,124 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.SerializedName;
+import com.google.gson.reflect.TypeToken;
 import vavi.net.ia.dotnet.QueryHelpers;
+import vavi.util.Debug;
 
 
 public class Client {
 
-    public final String Name = "InternetArchive.NET";
-    static Gson _json = new Gson().newBuilder().setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).create();
+    public static final String name = "vavi-nio-file-ia";
 
-    final Logger _logger = Logger.getLogger(Client.class.getName());
+    static XmlMapper jaxson = XmlMapper.xmlBuilder().build();
+
+    static Gson gson = new GsonBuilder()
+            .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+            .registerTypeAdapter(Integer.class, new JsonConverters.NullableStringToIntConverter())
+            .registerTypeAdapter(LocalDateTime.class, new JsonConverters.LocalDateTimeNullableConverter())
+            .registerTypeAdapter(ZonedDateTime.class, new JsonConverters.ZonedDateTimeNullableConverter())
+//            .registerTypeAdapter(String[].class, new JsonConverters.EnumerableStringConverter())
+//            .registerTypeAdapter(Number.class, new JsonConverters.NumberAdapter())
+            // TODO It’s too much bother to register generic types.
+            //  gson should be able to annotate generics types like "@Generics(types = {"Long", ...})"
+            //  and gson should offer deserializers for list and map
+            //  and about datetime related also
+            .registerTypeAdapter(new TypeToken<List<Changes.GetResponse.Change>>(){}.getType(), new JsonConverters.ListConverter<Changes.GetResponse.Change>())
+            .registerTypeAdapter(new TypeToken<List<String>>(){}.getType(), new JsonConverters.ListConverter<List<String>>())
+            .registerTypeAdapter(new TypeToken<List<Long>>(){}.getType(), new JsonConverters.ListConverter<List<Long>>())
+            .registerTypeAdapter(new TypeToken<List<Search.ScrapeResponseItem>>(){}.getType(), new JsonConverters.ListConverter<List<Search.ScrapeResponseItem>>())
+            .registerTypeAdapter(new TypeToken<List<Relationships.GetChildrenResponse.Response_.Doc>>(){}.getType(), new JsonConverters.ListConverter<List<Relationships.GetChildrenResponse.Response_.Doc>>())
+            .registerTypeAdapter(new TypeToken<List<ZonedDateTime>>(){}.getType(), new JsonConverters.ListConverter<List<ZonedDateTime>>())
+            .registerTypeAdapter(new TypeToken<List<Metadata.ReadResponse.File>>(){}.getType(), new JsonConverters.ListConverter<List<Metadata.ReadResponse.File>>())
+            .registerTypeAdapter(new TypeToken<List<Tasks.GetResponse.Value_.HistoryEntry>>(){}.getType(), new JsonConverters.ListConverter<List<Tasks.GetResponse.Value_.HistoryEntry>>())
+            .registerTypeAdapter(new TypeToken<Map<String, Views.Summary>>(){}.getType(), new JsonConverters.MapConverter<Views.Summary>())
+            .registerTypeAdapter(new TypeToken<Map<String, Relationships.SimpleList>>(){}.getType(), new JsonConverters.MapConverter<Views.Summary>())
+            .create();
+
+    final Logger logger = Logger.getLogger(Client.class.getName());
 
     public Client() {
-        if (this.httpClient == null) {
-            this.httpClient = HttpClient.newHttpClient();
-            //throw new IOException("Must pass an httpClient or an HttpClientFactory");
-        }
+        this.httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .build();
 
-        Changes = new Changes(this);
-        Item = new Item(this);
-        Metadata = new Metadata(this);
-        Relationships = new Relationships(this);
-        Reviews = new Reviews(this);
-        Search = new Search(this);
-        Tasks = new Tasks(this);
-        Views = new Views(this);
-        Wayback = new Wayback(this);
+        changes = new Changes(this);
+        item = new Item(this);
+        metadata = new Metadata(this);
+        relationships = new Relationships(this);
+        reviews = new Reviews(this);
+        search = new Search(this);
+        tasks = new Tasks(this);
+        views = new Views(this);
+        wayback = new Wayback(this);
     }
 
     private HttpClient httpClient;
 
-    private void InitHttpClient(HttpRequest.Builder builder) {
-        if (!ReadOnly && !DryRun) {
-            builder.setHeader("authorization", String.format("LOW %s:%s", AccessKey, SecretKey));
+    private void initHttpClient(HttpRequest.Builder builder) {
+        if (!readOnly && !dryRun) {
+            builder.header("authorization", String.format("LOW %s:%s", accessKey, secretKey));
         }
 
         // TODO
 //        String version = Assembly.GetExecutingAssembly().<AssemblyInformationalVersionAttribute>GetCustomAttribute().InformationalVersion;
 //        if (version == null) throw new IllegalStateException("Unable to get version");
 //
-//        ProductInfoHeaderValue productValue = new ProductInfoHeaderValue(Name, version);
+//        ProductInfoHeaderValue productValue = new ProductInfoHeaderValue(name, version);
 //        ProductInfoHeaderValue commentValue = new ProductInfoHeaderValue("(+https://github.com/experimentaltvcenter/InternetArchive.NET)");
 
-//        builder.setHeader("UserAgent", productValue);
-//        builder.setHeader("UserAgent", commentValue);
-        builder.setHeader("ExpectContinue", "true");
+//        builder.header("UserAgent", productValue);
+//        builder.header("UserAgent", commentValue);
+        builder.header("Accept-Encoding", "deflate,gzip");
+        builder.header("ExpectContinue", "true");
     }
 
-    public boolean ReadOnly;
-    public boolean DryRun;
+    public boolean readOnly;
+    public boolean dryRun;
 
-    String AccessKey = null;
-    transient String SecretKey = null;
+    String accessKey = null;
+    transient String secretKey = null;
 
-    public Changes Changes;
-    public Item Item;
-    public Metadata Metadata;
-    public Relationships Relationships;
-    public Reviews Reviews;
-    public Search Search;
-    public Tasks Tasks;
-    public Views Views;
-    public Wayback Wayback;
+    public Changes changes;
+    public Item item;
+    public Metadata metadata;
+    public Relationships relationships;
+    public Reviews reviews;
+    public Search search;
+    public Tasks tasks;
+    public Views views;
+    public Wayback wayback;
 
-    static Set<Consumer<HttpRequest.Builder>> decorators = new HashSet<>();
+    Set<Consumer<HttpRequest.Builder>> decorators = new HashSet<>(); // TODO hash not works
 
-    public static Client CreateReadOnly(boolean dryRun /*= false*/) {
-        Client client = GetClient(/*readOnly:*/true, dryRun);
-        decorators.add(client::InitHttpClient);
+    public static Client createReadOnly(boolean dryRun /*= false*/) {
+        Client client = getClient(/*readOnly:*/true, dryRun);
+        client.decorators.add(client::initHttpClient);
         return client;
     }
 
-    public static Client Create(String accessKey, String secretKey, boolean readOnly /*= false*/, boolean dryRun /*= false*/) {
-        Client client = GetClient(readOnly, dryRun);
+    public static Client createByKey(String accessKey, String secretKey, boolean readOnly /*= false*/, boolean dryRun /*= false*/) {
+        Client client = getClient(readOnly, dryRun);
 
-        client.AccessKey = accessKey;
-        client.SecretKey = secretKey;
+        client.accessKey = accessKey;
+        client.secretKey = secretKey;
 
-        decorators.add(client::InitHttpClient);
+        client.decorators.add(client::initHttpClient);
         return client;
     }
 
-    public static Client CreateAsync(String emailAddress /*= null*/, String password /*= null*/, boolean readOnly /*= false*/, boolean dryRun /*= false*/) throws IOException, InterruptedException {
-        Client client = GetClient(readOnly, dryRun);
+    public static Client create(String emailAddress /*= null*/, String password /*= null*/, boolean readOnly /*= false*/, boolean dryRun /*= false*/) throws IOException, InterruptedException {
+        Client client = getClient(readOnly, dryRun);
 
         if (emailAddress == null || password == null) {
             StringBuilder loginPrompt = new StringBuilder("Log in to archive.org");
@@ -125,7 +155,7 @@ public class Client {
             System.out.println();
 
             if (!readOnly) {
-                String message = "Email address";
+                String message = "email address";
                 if (emailAddress == null || emailAddress.isEmpty()) {
                     System.out.printf("%s: ", message);
                     emailAddress = new BufferedReader(new InputStreamReader(System.in)).readLine();
@@ -134,47 +164,52 @@ public class Client {
                 }
 
                 if (emailAddress == null || emailAddress.isEmpty()) {
-                    throw new IllegalArgumentException("Email address required");
+                    throw new IllegalArgumentException("email address required");
                 }
 
-                password = ReadPasswordFromConsole("Password: ");
+                password = readPasswordFromConsole("Password: ");
             }
         }
 
         if (!readOnly) {
-            client.LoginAsync(emailAddress, password, readOnly);
+            client.login(emailAddress, password, readOnly);
         }
 
-        decorators.add(client::InitHttpClient);
+        client.decorators.add(client::initHttpClient);
         return client;
     }
 
-    private static Client GetClient(boolean readOnly, boolean dryRun) {
+    private static Client getClient(boolean readOnly, boolean dryRun) {
         Client client = new Client();
 
-        client.ReadOnly = readOnly;
-        client.DryRun = dryRun;
+        client.readOnly = readOnly;
+        client.dryRun = dryRun;
 
         return client;
     }
 
-    public void RequestInteractivePriority(HttpRequest.Builder builder) {
+    public void requestInteractivePriority(HttpRequest.Builder builder) {
         builder.header("x-archive-interactive-priority", "1");
     }
 
-    <Response> Response GetAsync(String url, Map<String, String> query /*= null*/, Class<Response> c) throws IOException, InterruptedException {
-        if (query != null) url = QueryHelpers.AddQueryString(url, query);
+    <Response> Response get(String url, Map<String, String> query /*= null*/, Class<Response> c) throws IOException, InterruptedException {
+        return get(url, query, c, null);
+    }
+
+    <Response> Response get(String url, Map<String, String> query /*= null*/, Class<Response> c, Type t) throws IOException, InterruptedException {
+        if (query != null) url = QueryHelpers.addQueryString(url, query);
+Debug.println("url: " + url);
 
         var httpRequest = HttpRequest.newBuilder()
                 .GET()
                 .uri(URI.create(url));
 
-        var response = this.SendAsync(httpRequest, c);
+        var response = this.send(httpRequest, c, t);
         if (response == null) throw new IllegalArgumentException("null response from server");
         return response;
     }
 
-    static final String[] _readOnlyMethods = new String[] {
+    static final String[] readOnlyMethods = new String[] {
             "HEAD", "GET"
     };
 
@@ -184,32 +219,41 @@ public class Client {
             super(msg);
             this.statusCode = statusCode;
         }
+        @Override public String toString() {
+            return "HttpException: " + statusCode + ": " + getMessage();
+        }
     }
 
-    <Response> Response SendAsync(HttpRequest.Builder requestBuilder, Class<Response> c) throws IOException, InterruptedException {
+    <Response> Response send(HttpRequest.Builder requestBuilder, Class<Response> c) throws IOException, InterruptedException {
+        return send(requestBuilder, c, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    <Response> Response send(HttpRequest.Builder requestBuilder, Class<Response> c, Type t) throws IOException, InterruptedException {
         decorators.forEach(d -> d.accept(requestBuilder));
         var request = requestBuilder.build();
 
         log(request);
-        if (request.uri().getScheme().equals("http") && !ReadOnly)
+        if (request.uri().getScheme().equals("http") && !readOnly)
             throw new IllegalArgumentException("Insecure call");
 
-        if (ReadOnly && !Arrays.asList(_readOnlyMethods).contains(request.method())) {
-            if (DryRun) {
-                _logger.info("dry run");
+        if (readOnly && !Arrays.asList(readOnlyMethods).contains(request.method())) {
+            if (dryRun) {
+                logger.fine("dry run");
                 return null;
             } else {
                 throw new UnsupportedOperationException("Cannot call this function when the client is configured in read-only mode");
             }
         }
 
+        @SuppressWarnings("rawtypes")
         HttpResponse.BodyHandler handler = HttpResponse.BodyHandlers.discarding();
         if (c != HttpResponse.class) {
             handler = HttpResponse.BodyHandlers.ofString();
         }
 
         HttpResponse<Response> httpResponse = httpClient.send(request, handler);
-        _logger.fine(httpResponse.toString());
+        logger.fine(httpResponse.toString());
 
         if (httpResponse.statusCode() != 200) {
             throw new HttpException(request.uri().toString(), httpResponse.statusCode());
@@ -220,26 +264,40 @@ public class Client {
         }
 
         String responseString = (String) httpResponse.body();
+//Debug.println(Level.FINER, responseString.substring(0, Math.min(responseString.length(), 512)));
+Debug.println(Level.FINER, responseString);
 
         if (c == String.class) {
             return (Response) responseString;
         }
 
-        if (httpResponse.headers().firstValue("MediaType").get().equals("application/xml")) {
-            try {
-                var serializer = new XmlMapper();
-                XMLStreamReader xmlReader = XMLInputFactory.newFactory().createXMLStreamReader(new StringReader(responseString));
-                return serializer.readValue(xmlReader, c);
-            } catch (XMLStreamException e) {
-                throw new IOException(e);
+        var contentType = httpResponse.headers().firstValue("Content-Type");
+        if (contentType.isPresent()) {
+Debug.println(Level.FINE, "contentType: " + contentType.get());
+            if (contentType.get().contains("application/xml")) {
+                try {
+                    XMLStreamReader xmlReader = XMLInputFactory.newFactory().createXMLStreamReader(new StringReader(responseString));
+                    return t != null ? jaxson.readValue(xmlReader, (JavaType) t) : jaxson.readValue(xmlReader, c);
+                } catch (XMLStreamException e) {
+                    throw new IOException(e);
+                }
+            } else if (contentType.get().contains("application/json")) {
+                return Client.gson.fromJson(responseString, t != null ? t : c);
+            } else if (contentType.get().contains("text/html")) {
+Debug.println(Level.FINE, httpResponse.uri());
+                if (httpResponse.uri().toString().contains("https://archive.org/about/404.html")) {
+                    throw new HttpException(request.uri().toString(), 404);
+                }
             }
-        } else {
-            return Client._json.fromJson(responseString, c);
+            throw new IllegalStateException("unsupported content type: " + contentType.get());
         }
+        throw new IllegalStateException("no content type header");
     }
 
-    <Response> Response SendAsync(String httpMethod, String url, Object content, Class<Response> c) throws IOException, InterruptedException {
-        var json = _json.toJson(content);
+    /** body is json that is deserialized {@code content} */
+    <Response> Response send(String httpMethod, String url, Object content, Class<Response> c) throws IOException, InterruptedException {
+        var json = gson.toJson(content);
+Debug.println(Level.FINE, content.getClass().getSimpleName() + ": " + json);
         var StringContent = HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8);
 
         var httpRequest = HttpRequest.newBuilder()
@@ -248,49 +306,47 @@ public class Client {
                 .method(httpMethod, StringContent);
 
 
-        return this.SendAsync(httpRequest, c);
+        return this.send(httpRequest, c, null);
     }
 
-    <Response> Response SendAsync(String httpMethod, String url, String mime, HttpRequest.BodyPublisher content, Class<Response> c) throws IOException, InterruptedException {
+    <Response> Response send(String httpMethod, String url, String mime, HttpRequest.BodyPublisher content, Class<Response> c) throws IOException, InterruptedException {
         var httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Content-Type", mime)
                 .method(httpMethod, content);
 
-        return this.SendAsync(httpRequest, c);
+        return this.send(httpRequest, c, null);
     }
 
     private void log(HttpRequest request) {
-        Level logLevel = Level.INFO;
-        if (!_logger.isLoggable(logLevel)) return;
+        if (!logger.isLoggable(Level.FINE)) return;
 
-        _logger.log(logLevel, String.format("%s %s", request.method(), request.uri()));
+        logger.fine(String.format("%s %s", request.method(), request.uri()));
 
         if (request.headers() != null) {
-            _logger.log(logLevel, "Request headers:");
+            logger.fine("Request headers:");
             for (var kvp : request.headers().map().entrySet()) {
                 for (var value : kvp.getValue()) {
-                    _logger.log(logLevel, String.format("%s: %s", kvp.getKey(), value));
+                    System.err.printf("%s: %s%n", kvp.getKey(), value);
                 }
             }
         }
     }
 
     private HttpResponse<?> log(HttpResponse<?> response) {
-        Level logLevel = Level.INFO;
-        if (_logger.isLoggable(logLevel)) {
+        if (logger.isLoggable(Level.FINE)) {
             if (response.headers() != null) {
-                _logger.log(logLevel, "Response headers:");
+                logger.fine("response headers:");
                 for (var kvp : response.headers().map().entrySet()) {
                     for (var value : kvp.getValue()) {
-                        _logger.log(logLevel, String.format("%s: %s", kvp.getKey(), value));
+                        System.err.printf("%s: %s%n", kvp.getKey(), value);
                     }
                 }
             }
 
             String body = response.body().toString();
-            _logger.log(logLevel, "Response body: {body}", body);
-            _logger.log(response.statusCode() / 200 == 1 ? logLevel : Level.SEVERE, String.format("Result: %d %s", (int) response.statusCode(), response.body()));
+            logger.log(Level.FINE, "response body: {}", body);
+            logger.log(response.statusCode() / 200 == 1 ? Level.FINE : Level.SEVERE, String.format("result: %d %s", response.statusCode(), response.body()));
         }
 
         return response;
@@ -298,44 +354,44 @@ public class Client {
 
     static class LoginResponse extends ServerResponse {
 
-        public int Version;
+        public int version;
 
-        public Values_ Values;
+        public Values_ values;
 
         static class Values_ {
 
-            public String Reason;
+            public String reason;
 
             static class Cookies_ {
 
-                @JacksonXmlProperty(localName = "logged-in-sig")
-                public String LoggedInSig;
+                @SerializedName("logged-in-sig")
+                public String loggedInSig;
 
-                @JacksonXmlProperty(localName = "logged-in-user")
-                public String LoggedInUser;
+                @SerializedName("logged-in-user")
+                public String loggedInUser;
             }
 
-            public Cookies_ Cookies;
+            public Cookies_ cookies;
 
-            public String Email;
-            public String ItemName;
+            public String email;
+            public String itemName;
 
             static class S3_ {
 
-                @JacksonXmlProperty(localName = "access")
-                public String AccessKey = null;
+                @SerializedName("access")
+                public String accessKey = null;
 
-                @JacksonXmlProperty(localName = "secret")
-                public String SecretKey = null;
+                @SerializedName("secret")
+                public String secretKey = null;
             }
 
-            public S3_ S3;
+            public S3_ s3;
 
-            public String ScreenName;
+            public String screenName;
         }
     }
 
-    private void LoginAsync(String emailAddress, String password, boolean readOnly) throws IOException, InterruptedException {
+    private void login(String emailAddress, String password, boolean readOnly) throws IOException, InterruptedException {
         String url = "https://archive.org/services/xauthn/?op=login";
 
         httpClient = java.net.http.HttpClient.newBuilder()
@@ -351,31 +407,31 @@ public class Client {
                 .uri(URI.create(url))
                 .build();
 
-        _logger.info("Logging in...");
+        logger.fine("Logging in...");
         HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         log(httpResponse);
 
         if (httpResponse == null) throw new NullPointerException("httpResponse");
 
-        LoginResponse loginResponse = _json.fromJson(httpResponse.body(), LoginResponse.class);
+        LoginResponse loginResponse = gson.fromJson(httpResponse.body(), LoginResponse.class);
 
         if (httpResponse.statusCode() / 200 == 1) {
-            if (loginResponse == null || loginResponse.Values == null || loginResponse.Values.S3 == null)
+            if (loginResponse == null || loginResponse.values == null || loginResponse.values.s3 == null)
                 throw new NullPointerException("loginResponse");
-            loginResponse.EnsureSuccess();
+            loginResponse.ensureSuccess();
 
             if (!readOnly) {
-                AccessKey = loginResponse.Values.S3.AccessKey;
-                SecretKey = loginResponse.Values.S3.SecretKey;
+                accessKey = loginResponse.values.s3.accessKey;
+                secretKey = loginResponse.values.s3.secretKey;
             }
         } else if (httpResponse.statusCode() == 401 /*Unauthorized*/) {
-            throw new IOException("Login failed: " + loginResponse.Values.Reason);
+            throw new IOException("Login failed: " + loginResponse.values.reason);
         } else {
             throw new IOException(String.valueOf(httpResponse.statusCode()));
         }
     }
 
-    private static String ReadPasswordFromConsole(String prompt) throws IOException {
+    private static String readPasswordFromConsole(String prompt) throws IOException {
         System.out.print(prompt);
 
         StringBuilder password = new StringBuilder();
